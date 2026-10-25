@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AppHeader } from "@/components/layout/AppHeader";
+import { SessionProvider } from "@/components/auth/SessionProvider";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -26,8 +28,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-slate-100 text-slate-900">
-        <AppHeader />
-        {children}
+        <Suspense fallback={<main className="min-h-screen bg-slate-100" />}>
+          <SessionProvider>
+            <AppHeader />
+            {children}
+          </SessionProvider>
+        </Suspense>
       </body>
     </html>
   );

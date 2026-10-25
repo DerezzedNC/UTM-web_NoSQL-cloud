@@ -2,21 +2,22 @@ import Link from "next/link";
 
 export function AppHeader() {
   return (
-    <header className="border-b border-slate-200 bg-slate-950 text-white">
-      <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
-        <Link href="/" className="flex flex-col">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-teal-300">
-            UTM Desk
+    <header className="sticky top-0 z-30 border-b border-slate-200/60 bg-white/75 text-slate-900 backdrop-blur-md">
+      <div className="mx-auto flex w-full items-center justify-between gap-4 px-4 py-3 sm:px-6">
+        <Link href="/" className="flex items-center gap-3">
+          <span className="grid h-8 w-8 place-items-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 text-[10px] font-bold text-white shadow-lg shadow-emerald-500/20">
+            U
           </span>
-          <span className="text-sm font-medium text-slate-100">
-            NoSQL Cloud · incidencias de campus
+          <span>
+            <span className="block text-[11px] font-bold uppercase tracking-[0.2em] text-slate-900">UTM Desk</span>
+            <span className="block font-mono text-[9px] tracking-wider text-slate-400">NOSQL CLOUD OPS</span>
           </span>
         </Link>
         <Link
           href="/incidencias/nueva"
-          className="rounded-full bg-teal-500 px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-teal-400"
+          className="rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2 text-xs font-bold text-white shadow-md shadow-emerald-500/20 hover:from-emerald-500 hover:to-teal-500"
         >
-          Nueva incidencia
+          <span aria-hidden="true">+</span> Nueva incidencia
         </Link>
       </div>
     </header>

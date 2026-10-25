@@ -1,8 +1,18 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f1f5f9;
-  --foreground: #0f172a;
+  --background: #0c0920;
+  --foreground: #f8f7ff;
+  --surface: #16231f;
+  --surface-raised: #b9ebc9;
+  --surface-muted: #0f0b26;
+  --line: rgba(167, 139, 250, 0.22);
+  --line-strong: rgba(52, 211, 153, 0.5);
+  --success: #34d399;
+  --success-soft: rgba(16, 185, 129, 0.14);
+  --danger: #f87171;
+  --warning: #fbbf24;
+  --info: #60a5fa;
 }
 
 @theme inline {
@@ -12,8 +22,775 @@
   --font-mono: var(--font-geist-mono);
 }
 
-body {
+* {
+  box-sizing: border-box;
+}
+
+html {
   background: var(--background);
+}
+
+body {
+  min-width: 320px;
+  overflow-x: hidden;
+  background:
+    radial-gradient(circle at 8% -8%, rgba(139, 92, 246, 0.28), transparent 28rem),
+    radial-gradient(circle at 95% 12%, rgba(76, 29, 149, 0.24), transparent 26rem),
+    var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  font-family: "Arial Black", Arial, Helvetica, sans-serif;
+  font-size: 16px;
+}
+
+body,
+button,
+input,
+select,
+textarea,
+main a,
+main p,
+main span,
+main small,
+main label,
+main h1,
+main h2,
+main h3,
+main h4,
+main strong,
+main b {
+  font-family: "Arial Black", Arial, Helvetica, sans-serif !important;
+}
+
+main h1 {
+  font-size: clamp(1.85rem, 2.4vw, 2.5rem) !important;
+}
+
+main h2,
+main h3 {
+  font-size: 1.15rem !important;
+}
+
+main p,
+main span,
+main small,
+main label,
+main button,
+main a,
+main input,
+main select,
+main textarea {
+  font-size: 0.94rem !important;
+}
+
+main table th {
+  font-size: 0.78rem !important;
+}
+
+main table td {
+  font-size: 0.88rem !important;
+}
+
+main section.grid > article p[class*="text-xl"],
+main section.grid > article p[class*="text-2xl"],
+main section.grid > article p[class*="text-3xl"] {
+  font-size: 2.5rem !important;
+}
+
+/* Softer dark-purple global top bar with readable light typography. */
+body > div > header,
+body > div > div > header,
+body > div > div > div > header {
+  background: linear-gradient(100deg, #2b2154, #3f3270) !important;
+  border-bottom: 1px solid rgba(196, 181, 253, 0.45) !important;
+  color: #f5f3ff !important;
+  box-shadow: 0 10px 24px -18px rgba(12, 9, 32, 0.9);
+}
+
+body > div > header a,
+body > div > header span,
+body > div > div > header a,
+body > div > div > header span,
+body > div > div > div > header a,
+body > div > div > div > header span {
+  color: #f5f3ff !important;
+}
+
+body > div > header a[href="/incidencias/nueva"],
+body > div > div > header a[href="/incidencias/nueva"],
+body > div > div > div > header a[href="/incidencias/nueva"] {
+  background: linear-gradient(135deg, #059669, #047857) !important;
+  border-color: rgba(167, 243, 208, 0.55) !important;
+  color: #ffffff !important;
+}
+
+body > div > header a[href="/incidencias/nueva"] span,
+body > div > div > header a[href="/incidencias/nueva"] span,
+body > div > div > div > header a[href="/incidencias/nueva"] span {
+  color: #ffffff !important;
+}
+
+/* App-wide top header: replace the remaining light strip with the workspace purple. */
+body header {
+  background: linear-gradient(100deg, #17103a, #2b2154) !important;
+  border-color: rgba(167, 139, 250, 0.35) !important;
+  color: #f5f3ff !important;
+}
+
+body header a:not([href="/incidencias/nueva"]),
+body header span {
+  color: #f5f3ff !important;
+}
+
+body header a[href="/incidencias/nueva"] {
+  background: linear-gradient(135deg, #059669, #047857) !important;
+  color: #ffffff !important;
+}
+
+body > div {
+  position: relative;
+}
+
+body > div::before {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    linear-gradient(rgba(167, 139, 250, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(167, 139, 250, 0.045) 1px, transparent 1px);
+  background-size: 42px 42px;
+  content: "";
+  mask-image: linear-gradient(to bottom, black, transparent 80%);
+  pointer-events: none;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  transition: all 180ms ease;
+}
+
+button:active,
+a:active {
+  transform: scale(0.98);
+}
+
+/* Shared application shell */
+body > div > header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  min-height: 4.25rem;
+  background: rgba(12, 9, 32, 0.92) !important;
+  border-bottom: 1px solid rgba(167, 139, 250, 0.26) !important;
+  color: #f8fafc !important;
+  backdrop-filter: blur(16px);
+}
+
+body > div > header a {
+  color: #f8fafc !important;
+}
+
+body > div > header a[href="/incidencias/nueva"] {
+  background: linear-gradient(135deg, #059669, #047857) !important;
+  border: 1px solid rgba(110, 231, 183, 0.32);
+  border-radius: 0.75rem !important;
+  color: #ffffff !important;
+  box-shadow: 0 10px 24px -16px rgba(52, 211, 153, 0.9);
+}
+
+body > div > div > aside,
+body > div > main > aside {
+  width: 15rem !important;
+  padding: 1.5rem 1rem !important;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(139, 92, 246, 0.24), transparent 15rem),
+    #100b2b !important;
+  border-color: rgba(167, 139, 250, 0.2) !important;
+  color: #cbd5e1;
+  box-shadow: 12px 0 32px -28px rgba(0, 0, 0, 0.9);
+}
+
+body > div > div > aside > a:first-child span:first-child,
+body > div > main > aside > a:first-child span:first-child {
+  width: 2.5rem !important;
+  height: 2.5rem !important;
+  border-radius: 0.85rem !important;
+  background: linear-gradient(135deg, #34d399, #047857) !important;
+  box-shadow: 0 0 28px rgba(16, 185, 129, 0.3);
+}
+
+body > div > div > aside nav,
+body > div > main > aside nav {
+  margin-top: 1.75rem !important;
+}
+
+body > div > div > aside nav a,
+body > div > main > aside nav a {
+  margin: 0.25rem 0;
+  padding: 0.7rem 0.75rem !important;
+  border-left: 2px solid transparent;
+  border-radius: 0.75rem !important;
+  color: #94a3b8 !important;
+  font-size: 0.75rem !important;
+  font-weight: 700 !important;
+}
+
+body > div > div > aside nav a:hover,
+body > div > main > aside nav a:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-left-color: var(--success);
+  color: #f8fafc !important;
+}
+
+body > div > div > aside nav a[class*="bg-teal"],
+body > div > main > aside nav a[class*="bg-teal"] {
+  background: var(--success-soft) !important;
+  border-left-color: var(--success);
+  color: #6ee7b7 !important;
+}
+
+body > div > div > main,
+body > div > main {
+  min-width: 0;
+  background: transparent !important;
+}
+
+body > div > div > main > header,
+body > div > main > header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  min-height: 4.5rem;
+  padding: 1rem 2rem !important;
+  background: rgba(17, 12, 43, 0.92) !important;
+  border-bottom: 1px solid rgba(167, 139, 250, 0.3) !important;
+  color: #ffffff !important;
+  backdrop-filter: blur(14px);
+}
+
+body > div > div > main > header p,
+body > div > main > header p,
+body > div > div > main > header span,
+body > div > main > header span {
+  color: #ffffff !important;
+  font-weight: 800 !important;
+}
+
+body > div > div > main > header p:first-child,
+body > div > main > header p:first-child {
+  color: #6ee7b7 !important;
+  font-size: 0.78rem !important;
+  letter-spacing: 0.16em;
+}
+
+body > div > div > main > header p:last-child,
+body > div > main > header p:last-child {
+  color: #ffffff !important;
+  font-size: 1.15rem !important;
+}
+
+body > div > div > main > header span[class*="rounded-full"],
+body > div > main > header span[class*="rounded-full"] {
+  background: rgba(16, 185, 129, 0.16) !important;
+  border: 1px solid rgba(110, 231, 183, 0.38);
+  border-radius: 999px !important;
+  color: #d1fae5 !important;
+  font-size: 0.8rem !important;
+}
+
+/* Content hierarchy */
+main h1,
+main h2,
+main h3,
+main h4,
+main b,
+main strong,
+main label {
+  color: #f8fafc !important;
+}
+
+main p,
+main span,
+main small {
+  color: #cbd5e1 !important;
+}
+
+main h1 {
+  font-size: clamp(1.65rem, 2.2vw, 2.25rem) !important;
+  letter-spacing: -0.045em;
+}
+
+main h2,
+main h3 {
+  letter-spacing: -0.025em;
+}
+
+main > div > div,
+main > div > main > div,
+main > div > div > main > div {
+  padding: 2rem !important;
+}
+
+/* Cards and panels */
+main section,
+main article,
+main form,
+main [class*="rounded-lg"][class*="border"],
+main [class*="rounded-xl"][class*="border"],
+main [class*="rounded-2xl"][class*="border"] {
+  background: linear-gradient(145deg, #c9f2d5, #a9e1bb) !important;
+  border: 1px solid rgba(52, 211, 153, 0.52) !important;
+  border-radius: 1rem !important;
+  color: #123524 !important;
+  box-shadow: 0 18px 42px -28px rgba(5, 46, 32, 0.85), inset 0 1px 0 rgba(255, 255, 255, 0.65);
+}
+
+main section:hover,
+main article:hover {
+  background: linear-gradient(145deg, #d5f7df, #b8ecc8) !important;
+  border-color: #34d399 !important;
+  box-shadow: 0 22px 48px -28px #052e20, 0 0 24px -18px rgba(52, 211, 153, 0.65);
+}
+
+main section:not(:has(table)) h1,
+main section:not(:has(table)) h2,
+main section:not(:has(table)) h3,
+main section:not(:has(table)) h4,
+main section:not(:has(table)) b,
+main section:not(:has(table)) strong,
+main article h1,
+main article h2,
+main article h3,
+main article h4,
+main article b,
+main article strong {
+  color: #0b2e1e !important;
+}
+
+main section:not(:has(table)) p,
+main section:not(:has(table)) span,
+main section:not(:has(table)) small,
+main article p,
+main article span,
+main article small {
+  color: #24553b !important;
+}
+
+main section.grid {
+  gap: 1rem !important;
+}
+
+main section.grid > article {
+  min-height: 8.75rem;
+  padding: 1.25rem !important;
+  border-top: 2px solid var(--success) !important;
+}
+
+main section.grid > article p[class*="text-xl"],
+main section.grid > article p[class*="text-2xl"],
+main section.grid > article p[class*="text-3xl"] {
+  color: #082d1c !important;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 2.35rem !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.05em;
+}
+
+main section.grid > article > div:first-child span {
+  background: var(--success-soft) !important;
+  color: #6ee7b7 !important;
+  border-radius: 0.8rem !important;
+  box-shadow: inset 0 0 0 1px rgba(52, 211, 153, 0.2);
+}
+
+/* Tables */
+main table {
+  width: 100%;
+  background: #a9e1bb !important;
+  border-color: rgba(52, 211, 153, 0.4) !important;
+  font-size: 0.82rem !important;
+}
+
+main table thead {
+  background: #22734d !important;
+}
+
+main table th {
+  color: #94a3b8 !important;
+  font-size: 0.72rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.08em;
+}
+
+main table td {
+  color: #123524 !important;
+  font-size: 0.82rem !important;
+}
+
+main table tbody tr {
+  background: transparent !important;
+  border-color: rgba(148, 163, 184, 0.12) !important;
+}
+
+main table tbody tr:hover {
+  background: rgba(52, 211, 153, 0.26) !important;
+}
+
+/* Controls */
+main input:not([type="checkbox"]):not([type="radio"]),
+main select,
+main textarea {
+  background: var(--surface-muted) !important;
+  border: 1px solid rgba(148, 163, 184, 0.3) !important;
+  border-radius: 0.7rem !important;
+  color: #ffffff !important;
+  caret-color: var(--success);
+  font-size: 0.9rem !important;
+  font-weight: 650 !important;
+  -webkit-text-fill-color: #ffffff !important;
+}
+
+main input::placeholder,
+main textarea::placeholder {
+  color: #64748b !important;
+  opacity: 1 !important;
+}
+
+main input:not([type="checkbox"]):focus,
+main select:focus,
+main textarea:focus {
+  border-color: var(--success) !important;
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.16) !important;
+  outline: none;
+}
+
+main input[type="checkbox"] {
+  accent-color: #10b981;
+}
+
+/* Buttons */
+main button[class*="bg-teal-"],
+main a[class*="bg-teal-"] {
+  background: linear-gradient(135deg, #059669, #047857) !important;
+  border: 1px solid rgba(110, 231, 183, 0.3) !important;
+  color: #ffffff !important;
+  font-weight: 800 !important;
+  box-shadow: 0 10px 24px -16px rgba(52, 211, 153, 0.9);
+}
+
+main button[class*="bg-white"],
+main a[class*="bg-white"] {
+  background: #18232d !important;
+  border: 1px solid rgba(148, 163, 184, 0.26) !important;
+  color: #e2e8f0 !important;
+}
+
+/* Semantic colors */
+main [class*="bg-rose-"],
+main [class*="bg-red-"] {
+  background: rgba(127, 29, 29, 0.38) !important;
+  border-color: rgba(248, 113, 113, 0.45) !important;
+  color: #fecaca !important;
+}
+
+main [class*="text-rose-"],
+main [class*="text-red-"] {
+  color: #fca5a5 !important;
+}
+
+main [class*="bg-amber-"],
+main [class*="bg-yellow-"],
+main [class*="bg-orange-"] {
+  background: rgba(120, 53, 15, 0.38) !important;
+  border-color: rgba(251, 191, 36, 0.45) !important;
+  color: #fde68a !important;
+}
+
+main [class*="text-amber-"],
+main [class*="text-yellow-"],
+main [class*="text-orange-"] {
+  color: #fcd34d !important;
+}
+
+main [class*="bg-blue-"],
+main [class*="bg-indigo-"],
+main [class*="bg-cyan-"] {
+  background: rgba(30, 64, 175, 0.3) !important;
+  border-color: rgba(96, 165, 250, 0.42) !important;
+  color: #bfdbfe !important;
+}
+
+main [class*="text-blue-"],
+main [class*="text-indigo-"],
+main [class*="text-cyan-"] {
+  color: #93c5fd !important;
+}
+
+main [class*="bg-emerald-"],
+main [class*="bg-green-"],
+main [class*="bg-teal-"] {
+  background: var(--success-soft) !important;
+  border-color: rgba(52, 211, 153, 0.4) !important;
+  color: #a7f3d0 !important;
+}
+
+main [class*="text-emerald-"],
+main [class*="text-green-"],
+main [class*="text-teal-"] {
+  color: #6ee7b7 !important;
+}
+
+/* Login follows the same visual system. */
+main:has(form) {
+  background: #080d12 !important;
+}
+
+main:has(form) section:first-child {
+  background:
+    radial-gradient(circle at 20% 20%, rgba(52, 211, 153, 0.16), transparent 20rem),
+    #0b1519 !important;
+}
+
+main:has(form) form {
+  background: linear-gradient(145deg, #16232d, #111a22) !important;
+  padding: 2rem;
+}
+
+/* Deep purple workspace behind the green cards. */
+body,
+body > div,
+body > div > div,
+body > div > main,
+body > div > div > main,
+body > div > main > div,
+main > div,
+main > div > div {
+  background-color: #0c0920 !important;
+}
+
+body > div::before {
+  background:
+    radial-gradient(circle at 18% 8%, rgba(139, 92, 246, 0.24), transparent 28rem),
+    radial-gradient(circle at 90% 55%, rgba(76, 29, 149, 0.18), transparent 30rem),
+    linear-gradient(rgba(167, 139, 250, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(167, 139, 250, 0.045) 1px, transparent 1px) !important;
+  background-size: auto, auto, 42px 42px, 42px 42px !important;
+}
+
+main > div > div,
+main > div > main > div,
+main > div > div > main > div {
+  background: transparent !important;
+}
+
+main > div > div > aside,
+main > div > main > aside {
+  background:
+    radial-gradient(circle at 0% 0%, rgba(139, 92, 246, 0.24), transparent 15rem),
+    linear-gradient(180deg, #120c31, #0b0820) !important;
+}
+
+main > div > div > main > header,
+main > div > main > header {
+  background: linear-gradient(90deg, #17103a, #0f0a29) !important;
+  border-bottom-color: rgba(167, 139, 250, 0.35) !important;
+}
+
+/* Strong green surfaces for cards only; controls and semantic statuses keep their own colors. */
+main section,
+main article,
+main form,
+main [class*="rounded-lg"][class*="border"],
+main [class*="rounded-xl"][class*="border"],
+main [class*="rounded-2xl"][class*="border"] {
+  background: linear-gradient(145deg, #69d98e 0%, #28b866 100%) !important;
+  border-color: rgba(167, 243, 208, 0.9) !important;
+  color: #073b28 !important;
+  box-shadow: 0 18px 34px -22px rgba(4, 47, 32, 0.95), inset 0 1px 0 rgba(255, 255, 255, 0.48) !important;
+}
+
+main section:hover,
+main article:hover {
+  background: linear-gradient(145deg, #7ae9a0 0%, #3dcc78 100%) !important;
+  border-color: #d1fae5 !important;
+  box-shadow: 0 22px 42px -24px rgba(4, 47, 32, 0.98), 0 0 25px -15px rgba(52, 211, 153, 0.9) !important;
+}
+
+main section > h1,
+main section > h2,
+main section > h3,
+main section > h4,
+main section > p,
+main section > span,
+main section > small,
+main section > div > h1,
+main section > div > h2,
+main section > div > h3,
+main section > div > p,
+main section > div > span,
+main article h1,
+main article h2,
+main article h3,
+main article h4,
+main article p,
+main article span,
+main article small,
+main article b,
+main article strong,
+main form h1,
+main form h2,
+main form h3,
+main form p,
+main form label {
+  color: #073b28 !important;
+}
+
+main section table thead,
+main article table thead {
+  background: #207a4d !important;
+}
+
+main section table tbody tr,
+main article table tbody tr {
+  background: rgba(224, 255, 234, 0.22) !important;
+}
+
+main section table tbody tr:hover,
+main article table tbody tr:hover {
+  background: rgba(209, 250, 229, 0.46) !important;
+}
+
+main section table th,
+main article table th {
+  color: #ecfdf5 !important;
+}
+
+main section table td,
+main section table td *,
+main article table td,
+main article table td * {
+  color: #073b28 !important;
+}
+
+/* Keep buttons, inputs and status pills independent from card coloring. */
+main section button[class*="bg-teal-"],
+main article button[class*="bg-teal-"],
+main form button[class*="bg-teal-"],
+main section a[class*="bg-teal-"],
+main article a[class*="bg-teal-"] {
+  background: linear-gradient(135deg, #059669, #047857) !important;
+  color: #ffffff !important;
+}
+
+main section button[class*="bg-white"],
+main article button[class*="bg-white"],
+main section a[class*="bg-white"],
+main article a[class*="bg-white"] {
+  background: #18232d !important;
+  color: #e2e8f0 !important;
+}
+
+main section input:not([type="checkbox"]),
+main section select,
+main section textarea,
+main article input:not([type="checkbox"]),
+main article select,
+main article textarea,
+main form input:not([type="checkbox"]),
+main form select,
+main form textarea {
+  background: #eafff3 !important;
+  color: #047857 !important;
+  -webkit-text-fill-color: #047857 !important;
+}
+
+main section [class*="bg-rose-"],
+main section [class*="bg-red-"],
+main article [class*="bg-rose-"],
+main article [class*="bg-red-"] {
+  background: rgba(127, 29, 29, 0.85) !important;
+  color: #fecaca !important;
+}
+
+main section [class*="bg-amber-"],
+main section [class*="bg-yellow-"],
+main article [class*="bg-amber-"],
+main article [class*="bg-yellow-"] {
+  background: rgba(146, 64, 14, 0.88) !important;
+  color: #fde68a !important;
+}
+
+main section [class*="bg-blue-"],
+main section [class*="bg-indigo-"],
+main article [class*="bg-blue-"],
+main article [class*="bg-indigo-"] {
+  background: rgba(30, 64, 175, 0.82) !important;
+  color: #dbeafe !important;
+}
+
+/* Analytics/chart bars use a strong emerald visual without recoloring buttons. */
+main article [class*="h-1"] > div,
+main article [class*="h-1.5"] > div,
+main section article [class*="h-1"] > div,
+main section article [class*="h-1.5"] > div {
+  background: linear-gradient(90deg, #047857, #16a34a 55%, #22c55e) !important;
+  border-radius: 999px !important;
+  box-shadow: 0 0 12px rgba(34, 197, 94, 0.62);
+}
+
+main article [class*="h-1"],
+main article [class*="h-1.5"],
+main section article [class*="h-1"],
+main section article [class*="h-1.5"] {
+  background: rgba(6, 78, 59, 0.28) !important;
+  border-radius: 999px !important;
+}
+
+main article [class*="h-2"] > div,
+main section article [class*="h-2"] > div {
+  background: linear-gradient(180deg, #22c55e, #047857) !important;
+  border-radius: 0.35rem 0.35rem 0 0 !important;
+  box-shadow: 0 0 14px rgba(34, 197, 94, 0.45);
+}
+
+/* The concurrency chart is a bar chart, not a pill-shaped progress track. */
+.chart-card .chart-bars {
+  align-items: flex-end;
+  border-radius: 0 !important;
+  background: rgba(6, 78, 59, 0.2) !important;
+  box-shadow: inset 0 -1px 0 rgba(6, 78, 59, 0.45);
+  overflow: visible;
+}
+
+.chart-card .chart-bar {
+  display: block;
+  min-height: 0 !important;
+  border-radius: 0.2rem 0.2rem 0 0 !important;
+  background: linear-gradient(180deg, #4ade80 0%, #16a34a 48%, #047857 100%) !important;
+  box-shadow: 0 0 9px rgba(34, 197, 94, 0.55);
+  opacity: 1 !important;
+}
+
+/* Ensure the filled portion is never hidden by the track styling. */
+main article [style*="width"],
+main section article [style*="width"],
+main section > article [style*="width"] {
+  display: block !important;
+  min-height: 0.35rem;
+  background: linear-gradient(90deg, #047857 0%, #16a34a 55%, #4ade80 100%) !important;
+  border-radius: 999px !important;
+  opacity: 1 !important;
+  box-shadow: 0 0 14px rgba(34, 197, 94, 0.8) !important;
+}
+
+main article [class*="h-1.5"][style*="width"],
+main section article [class*="h-1.5"][style*="width"] {
+  min-height: 0.375rem;
+}
+
+main article [class*="h-1"][style*="width"],
+main section article [class*="h-1"][style*="width"] {
+  min-height: 0.3rem;
 }
