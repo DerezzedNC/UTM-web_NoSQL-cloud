@@ -2,10 +2,20 @@
 // Los endpoints reales siguen la Tabla 3 del documento (+ GET /incidencias y GET /incidencias/[id], ver nota en README).
 import { INCIDENCIAS as DB, USUARIOS } from './mock';
 const MOCK = process.env.NEXT_PUBLIC_USE_MOCK !== 'false';
-const me = () => JSON.parse(localStorage.getItem('usuario') || 'null');
+const me = () => {
+  try {
+    const value = JSON.parse(localStorage.getItem('usuario') || 'null');
+    return value && typeof value === 'object' && typeof value.rol === 'string' ? value : null;
+  } catch {
+    return null;
+  }
+};
 const wait = v => new Promise(r => setTimeout(() => r(structuredClone(v)), 250));
 const fail = m => new Promise((_, r) => setTimeout(() => r(new Error(m)), 250));
-const visible = (i, u) => u.rol === 'tecnico' ? i.categoria === u.area_asignada : u.rol === 'reportante' ? i.reportante.id_usuario === u.id_usuario : true;
+const visible = (i, u) => {
+  if (!u) throw new Error('Tu sesión no es válida. Inicia sesión nuevamente.');
+  return u.rol === 'tecnico' ? i.categoria === u.area_asignada : u.rol === 'reportante' ? i.reportante.id_usuario === u.id_usuario : true;
+};
 const find = id => DB.find(i => i._id === id);
 
 async function http(path, opts = {}) {

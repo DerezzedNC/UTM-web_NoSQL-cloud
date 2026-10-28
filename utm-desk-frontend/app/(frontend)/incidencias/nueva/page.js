@@ -48,23 +48,31 @@ export default function Nueva() {
     </label>);
   return (
     <Shell>{u => !can(u, 'crear') ? <p className="rounded bg-white p-6 text-sm">Tu rol no puede registrar incidencias.</p> : (
-      <form onSubmit={enviar} className="mx-auto max-w-2xl space-y-5">
-        <h1 className="text-2xl font-semibold">Reportar incidencia</h1>
+      <form onSubmit={enviar} className="mx-auto max-w-3xl space-y-6">
+        <div><p className="text-sm font-semibold uppercase tracking-wider text-teal">Nuevo reporte</p><h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-900">Reportar incidencia</h1><p className="mt-1 text-sm text-slate-500">Describe el problema con claridad para agilizar su atención.</p></div>
         <Err m={err} />
-        <label className="block text-sm">Título<input className={inp} value={f.titulo} onChange={set('titulo')} maxLength={150} /></label>
-        <label className="block text-sm">Descripción<textarea className={inp} rows={4} value={f.descripcion} onChange={set('descripcion')} /></label>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="text-sm">Área<select className={inp} value={f.categoria} onChange={e => { setF({ ...f, categoria: e.target.value }); setD({}); }}>{Object.entries(CAT).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
-          <label className="text-sm">Prioridad<select className={inp} value={f.prioridad} onChange={set('prioridad')}>{['baja', 'media', 'alta', 'critica'].map(p => <option key={p}>{p}</option>)}</select></label>
-          <label className="text-sm">Edificio<input className={inp} list="edif" value={f.edificio} onChange={set('edificio')} /><datalist id="edif">{EDIF.map(e => <option key={e} value={e} />)}</datalist></label>
-          <label className="text-sm">Piso<input className={inp} value={f.piso} onChange={set('piso')} /></label>
-          <label className="text-sm sm:col-span-2">Aula o laboratorio<input className={inp} value={f.aula_laboratorio} onChange={set('aula_laboratorio')} /></label>
-        </div>
-        <fieldset className="rounded border border-slate-300 bg-white p-4"><legend className="px-1 text-sm font-medium">Datos de {CAT[f.categoria]}</legend>
+        <section className="space-y-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm"><div><h2 className="font-semibold text-slate-900">Información de la incidencia</h2><p className="mt-1 text-sm text-slate-500">Indica qué sucede y qué tan urgente es.</p></div>
+          <label className="block text-sm font-medium text-slate-700">Título<input className={inp} value={f.titulo} onChange={set('titulo')} maxLength={150} /></label>
+          <label className="block text-sm font-medium text-slate-700">Descripción<textarea className={inp} rows={4} value={f.descripcion} onChange={set('descripcion')} /></label>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="text-sm font-medium text-slate-700">Área<select className={inp} value={f.categoria} onChange={e => { setF({ ...f, categoria: e.target.value }); setD({}); }}>{Object.entries(CAT).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+            <label className="text-sm font-medium capitalize text-slate-700">Prioridad<select className={inp} value={f.prioridad} onChange={set('prioridad')}>{['baja', 'media', 'alta', 'critica'].map(p => <option key={p}>{p}</option>)}</select></label>
+          </div>
+        </section>
+        <section className="space-y-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm"><div><h2 className="font-semibold text-slate-900">Ubicación</h2><p className="mt-1 text-sm text-slate-500">Ayuda al equipo a localizar el problema.</p></div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="text-sm font-medium text-slate-700">Edificio<input className={inp} list="edif" value={f.edificio} onChange={set('edificio')} /><datalist id="edif">{EDIF.map(e => <option key={e} value={e} />)}</datalist></label>
+            <label className="text-sm font-medium text-slate-700">Piso<input className={inp} value={f.piso} onChange={set('piso')} /></label>
+            <label className="text-sm font-medium text-slate-700 sm:col-span-2">Aula o laboratorio<input className={inp} value={f.aula_laboratorio} onChange={set('aula_laboratorio')} /></label>
+          </div>
+        </section>
+        <fieldset className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm"><legend className="px-1 font-semibold text-slate-900">Datos de {CAT[f.categoria]}</legend>
           <div className="grid gap-4 sm:grid-cols-2">{campos.map(campo)}</div></fieldset>
-        <label className="block text-sm">Etiquetas (separadas por coma)<input className={inp} value={f.tags} onChange={set('tags')} placeholder="sin-red, vlan-20" /></label>
-        <label className="block text-sm">Evidencia (PNG, JPG o PDF, máx. 5 MB)<input className="mt-1 block text-sm" type="file" accept="image/png,image/jpeg,application/pdf" onChange={e => setFile(e.target.files[0] || null)} /></label>
-        <button className={btn} disabled={busy}>{busy ? 'Registrando…' : 'Registrar incidencia'}</button>
+        <section className="space-y-4 rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+          <label className="block text-sm font-medium text-slate-700">Etiquetas <span className="font-normal text-slate-500">(separadas por coma)</span><input className={inp} value={f.tags} onChange={set('tags')} placeholder="sin-red, vlan-20" /></label>
+          <label className="block text-sm font-medium text-slate-700">Evidencia <span className="font-normal text-slate-500">(PNG, JPG o PDF, máx. 5 MB)</span><input className="mt-2 block w-full rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm" type="file" accept="image/png,image/jpeg,application/pdf" onChange={e => setFile(e.target.files[0] || null)} /></label>
+        </section>
+        <div className="flex justify-end"><button className={btn} disabled={busy}>{busy ? 'Registrando…' : 'Registrar incidencia'}</button></div>
       </form>)}</Shell>
   );
 }
