@@ -526,7 +526,7 @@ async function seedUsuarios(db: Db): Promise<{ inserted: number; skipped: number
 // 5. SEMBRAR 25 INCIDENCIAS SINTÉTICAS BALANCEADAS
 // ============================================================================
 
-interface IncidenciaSeedDoc {
+export interface IncidenciaSeedDoc {
   folio: string;
   titulo: string;
   descripcion: string;
@@ -590,8 +590,22 @@ interface IncidenciaSeedDoc {
   }>;
 }
 
-function buildSyntheticIncidents(): IncidenciaSeedDoc[] {
-  const d = (iso: string) => new Date(iso);
+export function buildSyntheticIncidents(baseDate: Date = new Date()): IncidenciaSeedDoc[] {
+  // Conversión dinámica de fechas relativas a Date.now():
+  // Mapea linealmente el rango original de simulación (5 al 17 de octubre de 2026)
+  // para que las incidencias resueltas queden entre 1 y 8 días atrás del momento
+  // de ejecución. De esta forma, el índice TTL de MongoDB (60 días = 5,184,000s sobre fecha_resolucion)
+  // las conserva intactas hasta finales de diciembre de 2026 (> 15 de diciembre de 2026).
+  const tMin = new Date("2026-10-05T00:00:00Z").getTime();
+  const tMax = new Date("2026-10-17T12:00:00Z").getTime();
+  const span = tMax - tMin;
+
+  const d = (iso: string): Date => {
+    const t = new Date(iso).getTime();
+    const progress = Math.max(0, Math.min(1, (t - tMin) / span));
+    const daysAgo = 8.0 - progress * 7.0; // Rango de 8 a 1 días atrás
+    return new Date(baseDate.getTime() - Math.round(daysAgo * 86400000));
+  };
 
   return [
     // ------------------------------------------------------------------------
@@ -2037,8 +2051,8 @@ async function syncRedisCounter(
     }
   }
 
-  // 2. El valor objetivo debe ser al menos el máximo de MongoDB, o 25 si acabamos de sembrar
-  const targetVal = Math.max(maxMongoSeq, 25);
+  // 2. El valor objetivo es la secuencia máxima existente en MongoDB Atlas (sin literales fijos)
+  const targetVal = maxMongoSeq;
 
   // 3. REGLA CRÍTICA DE INTEGRIDAD: delegada a ensureCounterAtLeast (INCRBY, nunca SET ni decremento)
   const result = await ensureCounterAtLeast(year, targetVal);
@@ -2177,5 +2191,9 @@ async function main() {
   }
 }
 
-// Ejecutar script
-main();
+// Ejecutar script solo cuando es invocado directamente (no cuando es importado por pruebas)
+const isDirectRun = process.argv[1]?.replace(/\\/g, "/").endsWith("scripts/setup-db-and-seed.ts");
+if (isDirectRun) {
+  main();
+}
+
