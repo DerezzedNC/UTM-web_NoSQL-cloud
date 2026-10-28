@@ -9,6 +9,7 @@ export type EvidenciaAdjunta = {
   peso_kb: number;
   fecha_carga: string;
   storage_key: string;
+  url_firmada?: string | null;
 };
 
 export type HistorialEvento = {
