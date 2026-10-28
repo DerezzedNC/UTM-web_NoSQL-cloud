@@ -27,7 +27,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="es"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-slate-100 text-slate-900">
+      <body className="min-h-full flex flex-col bg-slate-50 text-slate-900">
         <Suspense fallback={<main className="min-h-screen bg-slate-100" />}>
           <SessionProvider>
             <AppHeader />

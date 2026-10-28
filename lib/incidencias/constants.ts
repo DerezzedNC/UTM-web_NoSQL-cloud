@@ -54,6 +54,12 @@ export const BORRADOR_INICIAL = {
     piso: "",
     aula_laboratorio: "",
   },
+  reportante: {
+    id_usuario: "",
+    nombre: "",
+    rol: "Docente" as const,
+    correo: "",
+  },
   detalle_computo: {
     direccion_ip: "",
     vlan: "",
@@ -62,9 +68,8 @@ export const BORRADOR_INICIAL = {
   },
   detalle_infraestructura: {
     tipo_dano: "",
-    riesgo_seguridad: "Medio" as const,
+    riesgo_seguridad: "Medio",
     requiere_insumos: false,
-    insumos_solicitados: [] as string[],
     contratista_externo: false,
   },
   detalle_academico: {

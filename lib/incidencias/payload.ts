@@ -13,13 +13,19 @@ export function armarPayload(
     descripcion: borrador.descripcion,
     prioridad: borrador.prioridad,
     ubicacion: borrador.ubicacion,
+    reportante: borrador.reportante,
   };
 
   if (borrador.categoria === "computo_redes") {
     return {
       ...base,
       categoria: "computo_redes",
-      detalle_especifico: borrador.detalle_computo,
+      detalle_especifico: {
+        direccion_ip: borrador.detalle_computo.direccion_ip,
+        vlan: Number(borrador.detalle_computo.vlan),
+        puerto_uplink: borrador.detalle_computo.puerto_uplink,
+        equipos_afectados: borrador.detalle_computo.equipos_afectados.length,
+      },
     };
   }
 
@@ -27,12 +33,7 @@ export function armarPayload(
     return {
       ...base,
       categoria: "infraestructura",
-      detalle_especifico: {
-        ...borrador.detalle_infraestructura,
-        insumos_solicitados: borrador.detalle_infraestructura.requiere_insumos
-          ? borrador.detalle_infraestructura.insumos_solicitados
-          : [],
-      },
+      detalle_especifico: borrador.detalle_infraestructura,
     };
   }
 

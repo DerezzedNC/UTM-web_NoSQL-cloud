@@ -1,6 +1,4 @@
-import { ChipInput } from "@/components/ui/ChipInput";
 import { Field, inputClass } from "@/components/ui/Field";
-import { NIVELES_RIESGO } from "@/lib/incidencias/types";
 import type { DetalleInfraestructura as DetalleInfraestructuraValue } from "@/lib/incidencias/types";
 
 type DetalleInfraestructuraProps = {
@@ -50,11 +48,10 @@ export function DetalleInfraestructura({
             Boolean(errors["detalle_especifico.riesgo_seguridad"]),
           )}
         >
-          {NIVELES_RIESGO.map((nivel) => (
-            <option key={nivel} value={nivel}>
-              {nivel}
-            </option>
-          ))}
+          <option value="Bajo">Bajo</option>
+          <option value="Medio">Medio</option>
+          <option value="Alto">Alto</option>
+          <option value="Crítico">Crítico</option>
         </select>
       </Field>
       <label className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-800">
@@ -65,9 +62,6 @@ export function DetalleInfraestructura({
             onChange({
               ...value,
               requiere_insumos: event.target.checked,
-              insumos_solicitados: event.target.checked
-                ? value.insumos_solicitados
-                : [],
             })
           }
           className="mt-0.5 h-4 w-4 rounded border-slate-300 text-teal-700"
@@ -95,20 +89,6 @@ export function DetalleInfraestructura({
           </span>
         </span>
       </label>
-      {value.requiere_insumos ? (
-        <div className="sm:col-span-2">
-          <ChipInput
-            id="insumos_solicitados"
-            label="Insumos solicitados"
-            placeholder="Cable UTP, lámpara, válvula…"
-            values={value.insumos_solicitados}
-            error={errors["detalle_especifico.insumos_solicitados"]}
-            onChange={(insumos_solicitados) =>
-              onChange({ ...value, insumos_solicitados })
-            }
-          />
-        </div>
-      ) : null}
     </div>
   );
 }
