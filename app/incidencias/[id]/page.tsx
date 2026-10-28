@@ -1,121 +1,105 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useSession } from "@/components/auth/SessionProvider";
 import { CATEGORIA_META, PRIORIDAD_META } from "@/lib/incidencias/constants";
-import { INCIDENCIAS_INICIALES, type EstadoIncidencia, type IncidenciaDetalle, type RolUsuario } from "@/lib/incidencias/mock-data";
-import { addDemoEvidence, readDemoIncidencias, updateDemoStatus, updateDemoTags } from "@/lib/incidencias/demo-store";
-import { Can, RBACProvider } from "@/components/auth/Can";
+import { INCIDENCIAS_INICIALES } from "@/lib/incidencias/mock-data";
+import { canCloseTicket, hasPermission } from "@/lib/rbac";
+import type { EstadoIncidencia, IncidenciaCampus } from "@/lib/incidencias/types";
 
-const estados: EstadoIncidencia[] = ["abierta", "en_proceso", "en_espera", "resuelta", "cerrada"];
-const estadoLabel: Record<EstadoIncidencia, string> = { abierta: "Abierta", en_proceso: "En proceso", en_espera: "En espera", resuelta: "Resuelta", cerrada: "Cerrada" };
-const roles: RolUsuario[] = ["admin", "directiva", "coordinador", "tecnico", "reportante"];
-
-function Badge({ children, tone = "slate" }: { children: React.ReactNode; tone?: string }) {
-  const colors: Record<string, string> = { slate: "bg-slate-100 text-slate-600", red: "bg-rose-50 text-rose-700", amber: "bg-amber-50 text-amber-700", green: "bg-emerald-50 text-emerald-700", blue: "bg-blue-50 text-blue-700", teal: "bg-teal-50 text-teal-700" };
-  return <span className={`inline-flex rounded-md px-2 py-1 text-[10px] font-bold uppercase tracking-wide ${colors[tone] ?? colors.slate}`}>{children}</span>;
-}
-
-function DetailSpecific({ ticket }: { ticket: IncidenciaDetalle }) {
-  const detail = ticket.detalle_especifico;
-  const rows = "direccion_ip" in detail
-    ? [["Dirección IP", detail.direccion_ip], ["VLAN", detail.vlan], ["Puerto uplink", detail.puerto_uplink], ["Equipos afectados", detail.equipos_afectados.join(", ")]]
-    : "tipo_dano" in detail
-      ? [["Tipo de daño", detail.tipo_dano], ["Riesgo", detail.riesgo_seguridad], ["Requiere insumos", detail.requiere_insumos ? "Sí" : "No"], ["Insumos", detail.insumos_solicitados.join(", ") || "Ninguno"], ["Contratista externo", detail.contratista_externo ? "Sí" : "No"]]
-      : [["Plataforma", detail.plataforma], ["Código de curso", detail.codigo_curso], ["Periodo escolar", detail.periodo_escolar], ["Estudiantes impactados", detail.estudiantes_impactados]];
-  return <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p className="mb-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Telemetría polimórfica · {CATEGORIA_META[ticket.categoria].etiqueta}</p><div className="space-y-2">{rows.map(([label, value]) => <div key={label} className="flex items-start justify-between gap-3 border-b border-slate-100 pb-2 text-xs last:border-0 last:pb-0"><span className="text-slate-400">{label}</span><b className="max-w-[58%] text-right text-slate-700">{value}</b></div>)}</div></section>;
-}
-
-function daysLeft(fecha: string | undefined, now: number | null) {
-  if (!fecha) return 60;
-  if (!now) return 60;
-  return Math.max(0, 60 - Math.floor((now - new Date(fecha).getTime()) / 86400000));
-}
+const estados: EstadoIncidencia[] = ["abierta", "en proceso", "en espera", "resuelta", "cerrada"];
+const stateStyle: Record<EstadoIncidencia, string> = { abierta: "bg-teal-50 text-teal-700", "en proceso": "bg-emerald-50 text-emerald-700", "en espera": "bg-amber-50 text-amber-700", resuelta: "bg-emerald-50 text-emerald-700", cerrada: "bg-slate-100 text-slate-600" };
+const stateSelectClass = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition-all duration-200 focus:border-teal-600 focus:ring-2 focus:ring-teal-100";
 
 export default function IncidenciaDetallePage({ params }: { params: Promise<{ id: string }> }) {
-  const [id, setId] = useState("");
-  const [data, setData] = useState(INCIDENCIAS_INICIALES);
-  const [now, setNow] = useState<number | null>(null);
-  const [rol, setRol] = useState<RolUsuario>("admin");
-  const [selectedFolio, setSelectedFolio] = useState(INCIDENCIAS_INICIALES[0].folio);
-  const [tagInput, setTagInput] = useState("");
-  const [estadoNuevo, setEstadoNuevo] = useState<EstadoIncidencia>("en_proceso");
+  const { session } = useSession();
+  const [ticket, setTicket] = useState<IncidenciaCampus>();
+  const [estado, setEstado] = useState<EstadoIncidencia>("en proceso");
   const [horas, setHoras] = useState("0");
+  const [autor, setAutor] = useState("");
   const [comentario, setComentario] = useState("");
-  const [notice, setNotice] = useState("");
+  const [tag, setTag] = useState("");
   const [file, setFile] = useState<File | null>(null);
-  const [assignmentOpen, setAssignmentOpen] = useState(false);
-  const [assignmentPriority, setAssignmentPriority] = useState(INCIDENCIAS_INICIALES[0].prioridad);
+  const [notice, setNotice] = useState("");
+  const canUpdate = Boolean(session && hasPermission(session.role, "incidencia:update"));
+  const canManageTags = Boolean(session && hasPermission(session.role, "incidencia:tags"));
+  const canUpload = Boolean(session && hasPermission(session.role, "evidencia:upload"));
+  const availableStates = estados.filter((item) => item !== "cerrada" || Boolean(session && canCloseTicket(session.role)));
 
-  useEffect(() => { params.then((value) => setId(value.id)); }, [params]);
   useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setNow(Date.now());
-      setData(readDemoIncidencias());
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, []);
-  const ticket = useMemo(() => data.find((item) => item._id === id || item.folio === id) ?? data.find((item) => item.folio === selectedFolio) ?? data[0], [data, id, selectedFolio]);
-  const canAssign = rol === "admin" || rol === "coordinador";
-  const canTags = canAssign || rol === "tecnico";
-  const canEvidence = rol === "admin" || rol === "tecnico" || rol === "reportante";
-  const canFollowUp = rol === "admin" || rol === "tecnico";
+    params.then(({ id }) => setTicket(INCIDENCIAS_INICIALES.find((item) => item._id === id || item.folio === id)));
+  }, [params]);
 
-  async function updateTags(action: "add" | "remove", tag: string) {
-    const updated = updateDemoTags(ticket._id, action, tag.trim());
-    if (!updated) { setNotice("No se pudo actualizar las etiquetas."); return; }
-    setData((current) => current.map((item) => item._id === ticket._id ? updated : item));
-    setTagInput("");
-    setNotice("Etiquetas actualizadas con $addToSet / $pull.");
-  }
+  const detailRows = useMemo(() => {
+    if (!ticket) return [];
+    const detail = ticket.detalle_especifico;
+    if ("direccion_ip" in detail) return [["Dirección IP", detail.direccion_ip], ["VLAN", detail.vlan], ["Puerto uplink", detail.puerto_uplink], ["Equipos afectados", detail.equipos_afectados]];
+    if ("tipo_dano" in detail) return [["Tipo de daño", detail.tipo_dano], ["Riesgo", detail.riesgo_seguridad], ["Requiere insumos", detail.requiere_insumos ? "Sí" : "No"], ["Contratista externo", detail.contratista_externo ? "Sí" : "No"]];
+    return [["Plataforma", detail.plataforma], ["Código de curso", detail.codigo_curso], ["Periodo escolar", detail.periodo_escolar], ["Estudiantes impactados", detail.estudiantes_impactados]];
+  }, [ticket]);
 
-  async function submitFollowUp(event: React.FormEvent) {
+  async function submitStatus(event: FormEvent) {
     event.preventDefault();
-    if (!comentario.trim() || !Number.isFinite(Number(horas)) || Number(horas) < 0) {
-      setNotice("Completa un comentario y una cantidad de horas válida.");
-      return;
-    }
-    const updated = updateDemoStatus(ticket._id, estadoNuevo, Number(horas), comentario, rol);
-    if (!updated) { setNotice("No se pudo registrar el seguimiento."); return; }
-    setData((current) => current.map((item) => item._id === ticket._id ? updated : item));
-    setComentario(""); setHoras("0"); setNotice("Seguimiento registrado. Se actualizaron estado, bitácora y horas.");
+    if (!canUpdate) return setNotice("Esta función requiere el rol Técnico, Coordinador o Administrador.");
+    if (!ticket || !autor.trim() || !comentario.trim() || Number(horas) < 0) return setNotice("Completa autor, comentario y horas válidas.");
+    const response = await fetch(`/api/incidencias/${ticket._id}/estado`, { method: "PATCH", headers: { "Content-Type": "application/json", "x-user-role": session?.role ?? "" }, body: JSON.stringify({ estado_nuevo: estado, horas_sumadas: Number(horas), comentario, autor }) });
+    const body = await response.json() as { data?: IncidenciaCampus; error?: string };
+    if (!response.ok || !body.data) return setNotice(body.error ?? "No se pudo actualizar.");
+    setTicket(body.data); setComentario(""); setHoras("0"); setNotice("Actualización atómica aplicada.");
   }
 
-  async function uploadEvidence(event: React.FormEvent) {
+  async function updateTag(action: "add" | "remove", value: string) {
+    if (!canManageTags) return setNotice("Esta función requiere el rol Técnico, Coordinador o Administrador.");
+    if (!ticket || !value.trim()) return;
+    const response = await fetch(`/api/incidencias/${ticket._id}/tags`, { method: "PATCH", headers: { "Content-Type": "application/json", "x-user-role": session?.role ?? "" }, body: JSON.stringify({ action, tag: value.trim() }) });
+    const body = await response.json() as { data?: string[]; error?: string };
+    if (!response.ok || !body.data) return setNotice(body.error ?? "No se pudieron actualizar las etiquetas.");
+    setTicket({ ...ticket, tags: body.data }); setTag(""); setNotice("Etiquetas actualizadas.");
+  }
+
+  async function uploadEvidence(event: FormEvent) {
     event.preventDefault();
-    if (!file) return;
-    if (!["image/png", "image/jpeg", "application/pdf"].includes(file.type) || file.size > 5 * 1024 * 1024) {
-      setNotice("Solo se permiten PNG, JPEG o PDF de hasta 5 MB.");
-      return;
-    }
-    const evidence: IncidenciaDetalle["evidencias_adjuntas"][number] = {
-      nombre_archivo: file.name,
-      tipo_mime: file.type as "image/png" | "image/jpeg" | "application/pdf",
-      peso_kb: Math.ceil(file.size / 1024),
-      fecha_carga: new Date().toLocaleString("es-MX"),
-      storage_key: `demo/${ticket.folio}/${file.name}`,
-    };
-    const updated = addDemoEvidence(ticket._id, evidence);
-    if (!updated) { setNotice("No se pudo agregar la evidencia."); return; }
-    setData((current) => current.map((item) => item._id === ticket._id ? updated : item));
-    setFile(null); setNotice("Evidencia agregada al expediente.");
+    if (!canUpload) return setNotice("Esta función requiere el rol Reportante, Técnico o Administrador.");
+    if (!ticket || !file) return;
+    if (!["image/png", "image/jpeg", "application/pdf"].includes(file.type) || file.size > 5 * 1024 * 1024) return setNotice("Solo se permiten PNG, JPG o PDF de hasta 5 MB.");
+    const response = await fetch(`/api/incidencias/${ticket._id}/evidencias`, { method: "POST", headers: { "Content-Type": "application/json", "x-user-role": session?.role ?? "" }, body: JSON.stringify({ nombre_archivo: file.name, tipo_mime: file.type, peso_kb: Math.ceil(file.size / 1024), url_storage: `incidencias/${ticket.folio}/${file.name}` }) });
+    const body = await response.json() as { data?: IncidenciaCampus["evidencias_adjuntas"][number]; error?: string };
+    if (!response.ok || !body.data) return setNotice(body.error ?? "No se pudo cargar la evidencia.");
+    setTicket({ ...ticket, evidencias_adjuntas: [...ticket.evidencias_adjuntas, body.data] }); setFile(null); setNotice("Evidencia agregada.");
   }
 
-  return <RBACProvider role={rol}><div className="min-h-screen bg-[#f8f7ff] text-slate-800">
-    <div className="border-b border-slate-200 bg-white px-5 py-3"><div className="mx-auto flex max-w-[1380px] items-center justify-between"><Link href="/incidencias" className="text-xs font-bold text-teal-700">← Bandeja</Link><div className="flex items-center gap-3 text-[10px]"><span className="font-bold uppercase tracking-widest text-slate-400">Sede activa</span><b>Campus Central UTM</b><span className="rounded-full bg-emerald-50 px-2 py-1 text-emerald-700">● Sync real-time</span><span className="rounded-full bg-teal-800 px-2 py-1 text-white">CM</span></div></div></div>
-    <main className="mx-auto max-w-[1380px] p-5 sm:p-7">
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-4"><div><div className="flex flex-wrap items-center gap-2"><span className="font-mono text-xl font-bold text-teal-800">{ticket.folio}</span><Badge tone="red">{PRIORIDAD_META[ticket.prioridad].etiqueta}</Badge><Badge tone={ticket.estado === "resuelta" ? "green" : "amber"}>{estadoLabel[ticket.estado]}</Badge></div><h1 className="mt-2 text-2xl font-bold text-slate-900">{ticket.titulo}</h1><p className="mt-1 text-xs text-slate-500">ID MongoDB: {ticket._id} · {ticket.horas_invertidas} horas invertidas</p></div><div className="flex flex-wrap items-center gap-2"><label className="text-[10px] font-bold uppercase text-slate-400">Probar rol<select value={rol} onChange={(event) => setRol(event.target.value as RolUsuario)} className="ml-2 rounded-md border border-slate-200 bg-white px-2 py-2 text-xs font-semibold text-slate-700">{roles.map((item) => <option key={item}>{item}</option>)}</select></label><select value={selectedFolio} onChange={(event) => setSelectedFolio(event.target.value)} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold"><option>INC-2026-0001</option><option>INC-2026-0002</option><option>INC-2026-0003</option></select><Can do="dispatch:assign">{canAssign ? <button onClick={() => { setAssignmentPriority(ticket.prioridad); setAssignmentOpen(true); }} className="rounded-lg bg-teal-800 px-3 py-2 text-xs font-bold text-white">Asignar / Prioridad</button> : null}</Can></div></div>
-      {ticket.estado === "resuelta" ? <div className="mb-5 flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-800"><b>Índice TTL activo</b><span>Este expediente se eliminará en {daysLeft(ticket.fecha_resolucion, now)} días desde fecha_resolucion.</span></div> : null}
-      {notice ? <div className="mb-4 rounded-lg bg-indigo-50 px-4 py-2 text-xs text-indigo-700">{notice}</div> : null}
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="space-y-5">
-          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><h2 className="text-sm font-bold text-slate-900">Descripción de la incidencia</h2><span className="text-[10px] text-slate-400">CU-02 · Evidencias adjuntas</span></div><p className="mt-4 text-sm leading-6 text-slate-600">{ticket.descripcion}</p><div className="mt-5 border-t border-slate-100 pt-4">          <div className="mb-3 flex items-center justify-between"><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Galería de evidencias ({ticket.evidencias_adjuntas.length})</p>{canEvidence ? <Can do="evidence:upload"><form onSubmit={uploadEvidence} className="flex items-center gap-2"><label className="cursor-pointer rounded-md border border-slate-200 px-2 py-1.5 text-[10px] font-semibold text-slate-600">+ Cargar evidencia<input type="file" accept="image/png,image/jpeg,application/pdf" className="hidden" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></label>{file ? <button className="rounded-md bg-teal-700 px-2 py-1.5 text-[10px] font-bold text-white">Subir</button> : null}</form></Can> : null}</div><div className="grid gap-3 sm:grid-cols-2">{ticket.evidencias_adjuntas.map((evidencia) => <div key={evidencia.storage_key} className="rounded-lg border border-slate-200 bg-slate-50 p-3"><div className="flex h-24 items-center justify-center rounded-md bg-slate-200 text-3xl text-slate-400">{evidencia.tipo_mime === "application/pdf" ? "▤" : "▧"}</div><p className="mt-2 truncate text-xs font-bold text-slate-700">{evidencia.nombre_archivo}</p><p className="mt-1 text-[10px] text-slate-400">{evidencia.tipo_mime} · {evidencia.peso_kb} KB</p><p className="text-[10px] text-slate-400">{evidencia.fecha_carga}</p><p className="mt-1 truncate font-mono text-[9px] text-teal-700" title={evidencia.storage_key}>storage_key: {evidencia.storage_key}</p></div>)}</div></div></section>
-          <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><div><h2 className="text-sm font-bold text-slate-900">Bitácora de Eventos NoSQL</h2><p className="mt-1 text-[10px] text-slate-400">historial_seguimiento[] · Inmutable document ledger</p></div><Badge tone="teal">{ticket.historial_seguimiento.length} eventos</Badge></div><div className="mt-5 space-y-4">{ticket.historial_seguimiento.map((event) => <article key={`${event.fecha}-${event.autor}`} className="relative border-l-2 border-teal-200 pl-5"><span className="absolute -left-[7px] top-0 h-3 w-3 rounded-full border-2 border-white bg-teal-700" /><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-bold text-slate-800">{event.autor}</p><span className="text-[10px] text-slate-400">{event.fecha}</span></div><div className="mt-1 flex gap-2"><Badge tone="blue">{estadoLabel[event.estado_nuevo]}</Badge><Badge tone="slate">+{event.horas_sumadas} h</Badge></div><p className="mt-2 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600">{event.comentario}</p></article>)}</div></section>
-          {canFollowUp ? <Can do="ticket:update"><form onSubmit={submitFollowUp} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"><h2 className="text-sm font-bold text-slate-900">Nuevo Registro de Seguimiento</h2><p className="mt-1 text-xs text-slate-500">La actualización usa $inc para horas_invertidas y agrega un evento a la bitácora.</p><div className="mt-4 grid gap-3 sm:grid-cols-2"><label className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Estado nuevo<select value={estadoNuevo} onChange={(event) => setEstadoNuevo(event.target.value as EstadoIncidencia)} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-700">{estados.map((item) => <option key={item}>{item}</option>)}</select></label><label className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Horas sumadas<input type="number" min="0" step="0.1" value={horas} onChange={(event) => setHoras(event.target.value)} className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs text-slate-700" /></label></div><textarea required value={comentario} onChange={(event) => setComentario(event.target.value)} placeholder="Describe la intervención técnica realizada..." className="mt-3 min-h-24 w-full rounded-lg border border-slate-200 p-3 text-xs outline-none focus:border-teal-500" /><button className="mt-3 rounded-lg bg-teal-800 px-4 py-2.5 text-xs font-bold text-white">Registrar en Ledger NoSQL</button></form></Can> : null}
+  if (!ticket) return <main className="min-h-screen bg-slate-50 p-8 text-slate-600">Cargando expediente...</main>;
+  return (
+    <main className="min-h-screen bg-slate-50 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-50/80 via-slate-50 to-teal-50/40 px-4 py-8 text-slate-800 sm:px-8">
+      <div className="mx-auto max-w-5xl"><Link href="/incidencias" className="font-semibold text-teal-700">← Incidencias</Link>
+        <header className="mt-5 rounded-2xl border border-slate-200/80 bg-white/90 p-6 shadow-sm">
+          <div className="flex flex-wrap items-center gap-2"><span className="rounded-lg bg-slate-100 px-2.5 py-1 font-mono text-xs font-bold text-slate-600">{ticket.folio}</span><span className={`rounded-lg px-2.5 py-1 text-xs font-bold ${stateStyle[ticket.estado]}`}>{ticket.estado}</span><span className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-semibold">{PRIORIDAD_META[ticket.prioridad].etiqueta}</span><span className="rounded-lg border border-teal-200 bg-teal-50 px-2.5 py-1 text-xs font-semibold text-teal-700">{CATEGORIA_META[ticket.categoria].etiqueta}</span></div>
+          <div className="mt-4 flex flex-wrap items-end justify-between gap-4"><div><h1 className="text-2xl font-bold tracking-tight text-slate-800">{ticket.titulo}</h1><p className="mt-2 max-w-3xl text-slate-600">{ticket.descripcion}</p><p className="mt-3 font-mono text-xs text-slate-500">Creada: {ticket.fecha_creacion}{ticket.fecha_resolucion ? ` · Resuelta: ${ticket.fecha_resolucion}` : ""}</p></div><div className="rounded-2xl bg-teal-50 px-5 py-3 text-center"><p className="text-xs font-bold uppercase tracking-wider text-teal-600">Horas invertidas</p><p className="mt-1 text-2xl font-bold text-teal-800">{ticket.horas_invertidas}</p></div></div>
+        </header>
+        <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <div className="space-y-6 lg:col-span-2"><section className="grid gap-4 sm:grid-cols-2"><InfoCard title="Reportante"><p className="font-semibold text-slate-900">{ticket.reportante.nombre}</p><p>{ticket.reportante.rol}</p><p className="font-mono text-xs">{ticket.reportante.correo}</p><p className="font-mono text-xs">{ticket.reportante.id_usuario}</p></InfoCard><InfoCard title="Ubicación"><p className="font-semibold text-slate-900">{ticket.ubicacion.edificio}</p><p>{ticket.ubicacion.piso} · {ticket.ubicacion.aula_laboratorio}</p></InfoCard></section>
+            <section className="rounded-2xl border border-slate-200/80 bg-white/90 p-6 shadow-sm"><h2 className="text-lg font-bold text-slate-900">Detalle específico · {CATEGORIA_META[ticket.categoria].etiqueta}</h2><div className="mt-5 grid gap-3 sm:grid-cols-2">{detailRows.map(([label, value]) => <div key={label} className="rounded-xl bg-slate-50 p-3"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</p><p className="mt-1 font-semibold text-slate-900">{value}</p></div>)}</div></section>
+            <section className="rounded-2xl border border-slate-200/80 bg-white/90 p-6 shadow-sm"><h2 className="text-lg font-bold text-slate-900">Bitácora de seguimiento</h2><div className="mt-5 space-y-5 border-l-2 border-teal-100 pl-5">{ticket.historial_seguimiento.map((item) => <div key={`${item.fecha}-${item.autor}`} className="relative"><span className="absolute -left-[27px] top-1 h-3 w-3 rounded-full bg-teal-500 ring-4 ring-teal-50" /><div className="flex flex-wrap items-center gap-2"><span className="font-mono text-xs text-slate-500">{item.fecha}</span><span className={`rounded px-2 py-1 text-xs font-semibold ${stateStyle[item.estado_nuevo]}`}>{item.estado_nuevo}</span><span className="text-xs font-semibold text-slate-700">{item.autor} · +{item.horas_sumadas} h</span></div><p className="mt-2 text-sm text-slate-600">{item.comentario}</p></div>)}</div></section>
+          </div>
+          <aside className="space-y-6">
+            {canUpdate ? <OperationCard title="Actualizar estado">
+              <form onSubmit={submitStatus} className="mt-4 space-y-3"><label className="block text-xs font-semibold text-slate-600" htmlFor="estado-nuevo">Estado</label><select id="estado-nuevo" value={estado} onChange={(e) => setEstado(e.target.value as EstadoIncidencia)} className={stateSelectClass}>{availableStates.map((item) => <option key={item}>{item}</option>)}</select><input type="number" min="0" step="0.1" value={horas} onChange={(e) => setHoras(e.target.value)} placeholder="Horas" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm" /><input value={autor} onChange={(e) => setAutor(e.target.value)} placeholder="Autor" className="w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm" /><textarea value={comentario} onChange={(e) => setComentario(e.target.value)} placeholder="Comentario" className="min-h-24 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm" /><button className="w-full rounded-lg bg-[#11695c] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#0d5449]">Guardar</button></form>
+            </OperationCard> : null}
+            <OperationCard title="Etiquetas"><div className="mt-4 flex flex-wrap gap-2">{ticket.tags.map((item) => <span key={item} className="rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700">#{item}{canManageTags ? <button type="button" onClick={() => updateTag("remove", item)} className="ml-2 font-bold text-slate-400 hover:text-red-600">×</button> : null}</span>)}</div>{canManageTags ? <div className="mt-4 flex gap-2"><input value={tag} onChange={(e) => setTag(e.target.value)} placeholder="Nueva etiqueta" className="min-w-0 flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm" /><button type="button" onClick={() => updateTag("add", tag)} className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-medium text-slate-700">Agregar</button></div> : null}</OperationCard>
+            <OperationCard title="Evidencias"><ul className="mt-4 space-y-2 text-xs">{ticket.evidencias_adjuntas.map((item) => <li key={item.url_storage} className="rounded-lg bg-slate-50 p-3"><p className="font-semibold text-slate-900">{item.nombre_archivo}</p><p className="mt-1 text-slate-500">{item.tipo_mime} · {item.peso_kb} KB</p><a href={item.url_storage} className="mt-1 block truncate text-teal-700 hover:underline">{item.url_storage}</a></li>)}</ul>{canUpload ? <form onSubmit={uploadEvidence} className="mt-4 rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4"><p className="text-sm text-slate-600">PNG, JPG o PDF</p><input type="file" accept="image/png,image/jpeg,application/pdf" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="mt-3 w-full text-xs" /><button className="mt-3 w-full rounded-lg bg-[#11695c] px-3 py-2 text-sm font-medium text-white">Cargar</button></form> : null}</OperationCard>
+          </aside>
         </div>
-        <aside className="space-y-5"><DetailSpecific ticket={ticket} /><section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p className="mb-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Etiquetas operativas</p><div className="flex flex-wrap gap-1.5">{ticket.tags.map((tag) => <button key={tag} disabled={!canTags} onClick={() => updateTags("remove", tag)} className="rounded-md bg-teal-50 px-2 py-1 text-[10px] font-semibold text-teal-700">#{tag}{canTags ? " ×" : ""}</button>)}</div>{canTags ? <div className="mt-3 flex gap-2"><input value={tagInput} onChange={(event) => setTagInput(event.target.value)} placeholder="Nueva etiqueta" className="min-w-0 flex-1 rounded-md border border-slate-200 px-2 py-1.5 text-xs" /><button onClick={() => tagInput.trim() && updateTags("add", tagInput.trim())} className="rounded-md bg-slate-800 px-2 py-1 text-[10px] font-bold text-white">Añadir</button></div> : <p className="mt-2 text-[10px] text-slate-400">Solo roles con permisos de operación pueden editar tags.</p>}</section><section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p className="mb-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Punto de servicio</p><p className="text-sm font-bold text-slate-800">⌖ {ticket.ubicacion.edificio} · {ticket.ubicacion.piso}</p><p className="mt-1 text-xs text-slate-500">{ticket.ubicacion.aula_laboratorio}</p><div className="mt-4 border-t border-slate-100 pt-3"><p className="text-[10px] text-slate-400">Reportante</p><p className="mt-1 text-xs font-bold">{ticket.reportante.nombre}</p><p className="text-[11px] text-slate-500">{ticket.reportante.cargo}<br />{ticket.reportante.correo}</p></div></section><section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"><p className="mb-3 text-[10px] font-bold uppercase tracking-[0.18em] text-slate-400">Técnico asignado</p>{ticket.tecnico_asignado ? <><p className="text-sm font-bold">{ticket.tecnico_asignado.nombre}</p><p className="mt-1 text-xs text-slate-500">{ticket.tecnico_asignado.correo}<br />Área: {ticket.tecnico_asignado.area}<br />ID: {ticket.tecnico_asignado.id_usuario}</p></> : <p className="text-xs italic text-slate-400">Sin técnico asignado</p>}</section></aside>
+        {notice ? <p role="status" className="mt-5 rounded-xl border border-teal-200 bg-teal-50 p-4 text-sm font-semibold text-teal-800">{notice}</p> : null}
       </div>
     </main>
-    {assignmentOpen ? <div className="fixed inset-0 z-10 grid place-items-center bg-slate-950/30 p-4"><div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl"><div className="flex justify-between"><h2 className="font-bold">Asignar técnico y ajustar prioridad</h2><button onClick={() => setAssignmentOpen(false)}>×</button></div><p className="mt-3 text-xs text-slate-500">Este modal representa la operación atómica sobre tecnico_asignado y prioridad.</p><label className="mt-4 block text-xs font-semibold">Prioridad<select value={assignmentPriority} onChange={(event) => setAssignmentPriority(event.target.value as IncidenciaDetalle["prioridad"])} className="mt-1 w-full rounded-md border p-2 text-xs">{Object.keys(PRIORIDAD_META).map((item) => <option key={item}>{item}</option>)}</select></label><button onClick={() => { setData((current) => current.map((item) => item._id === ticket._id ? { ...item, prioridad: assignmentPriority } : item)); setAssignmentOpen(false); setNotice("Asignación y prioridad actualizadas."); }} className="mt-4 w-full rounded-lg bg-teal-800 px-3 py-2 text-xs font-bold text-white">Guardar cambios</button></div></div> : null}
-  </div></RBACProvider>;
+  );
+}
+
+function InfoCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return <section className="rounded-2xl border border-slate-200/80 bg-white/90 p-5 shadow-sm"><p className="text-xs font-bold uppercase tracking-wider text-slate-500">{title}</p><div className="mt-3 space-y-1 text-sm text-slate-600">{children}</div></section>;
+}
+
+function OperationCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-xs"><h2 className="font-semibold text-slate-900">{title}</h2>{children}</section>;
 }

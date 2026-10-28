@@ -51,7 +51,7 @@ export function Field({ id, label, hint, error, children }: FieldProps) {
 }
 
 const controlClass =
-  "w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-600 focus:ring-2 focus:ring-teal-100 disabled:bg-slate-50";
+  "w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm outline-none transition-all duration-200 placeholder:text-slate-400 focus:border-teal-600 focus:ring-2 focus:ring-teal-500/20 disabled:bg-slate-50";
 
 export function inputClass(hasError?: boolean) {
   return `${controlClass} ${hasError ? "border-rose-400 focus:border-rose-500 focus:ring-rose-100" : ""}`;

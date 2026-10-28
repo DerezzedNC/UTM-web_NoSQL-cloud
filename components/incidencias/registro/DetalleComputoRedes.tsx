@@ -1,6 +1,5 @@
-import { ChipInput } from "@/components/ui/ChipInput";
 import { Field, inputClass } from "@/components/ui/Field";
-import type { DetalleComputoRedes as DetalleComputoRedesValue } from "@/lib/incidencias/types";
+import type { BorradorDetalleComputo as DetalleComputoRedesValue } from "@/lib/incidencias/types";
 
 type DetalleComputoRedesProps = {
   value: DetalleComputoRedesValue;
@@ -66,19 +65,20 @@ export function DetalleComputoRedes({
           )}
         />
       </Field>
-      <div className="sm:col-span-2">
-        <ChipInput
+      <Field
+        id="equipos_afectados"
+        label="Equipos afectados"
+        hint="Cantidad de equipos afectados."
+        error={errors["detalle_especifico.equipos_afectados"]}
+      >
+        <input
           id="equipos_afectados"
-          label="Equipos afectados"
-          hint="Escribe un equipo y pulsa Agregar o Enter."
-          placeholder="Switch A-201"
-          values={value.equipos_afectados}
-          error={errors["detalle_especifico.equipos_afectados"]}
-          onChange={(equipos_afectados) =>
-            onChange({ ...value, equipos_afectados })
-          }
+          value={value.equipos_afectados.length ? value.equipos_afectados[0] : ""}
+          onChange={(event) => onChange({ ...value, equipos_afectados: event.target.value ? [event.target.value] : [] })}
+          inputMode="numeric"
+          className={inputClass(Boolean(errors["detalle_especifico.equipos_afectados"]))}
         />
-      </div>
+      </Field>
     </div>
   );
 }
