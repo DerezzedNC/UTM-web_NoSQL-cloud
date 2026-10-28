@@ -2,9 +2,6 @@ import { NextResponse } from "next/server";
 import { checkMongoConnection } from "@/lib/mongodb";
 import { checkRedisConnection } from "@/lib/redis";
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-
 export async function GET() {
   const timestamp = new Date().toISOString();
 

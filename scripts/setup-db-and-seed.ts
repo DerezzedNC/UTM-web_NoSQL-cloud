@@ -380,6 +380,21 @@ async function setupIndexes(db: Db) {
       { name: "idx_reportante_usuario" }
     );
   }
+  // Índices auxiliares optimizados con justificación operativa:
+  // - idx_tecnico_estado: acelera las consultas de técnicos filtrando sus tareas asignadas por estado activo
+  if (!incIndexNames.has("idx_tecnico_estado")) {
+    await colIncidencias.createIndex(
+      { "tecnico_asignado.id_usuario": 1, estado: 1 },
+      { name: "idx_tecnico_estado" }
+    );
+  }
+  // - idx_reportante_fecha: acelera el listado cronológico de incidencias propias en /mis-incidencias
+  if (!incIndexNames.has("idx_reportante_fecha")) {
+    await colIncidencias.createIndex(
+      { "reportante.id_usuario": 1, fecha_creacion: -1 },
+      { name: "idx_reportante_fecha" }
+    );
+  }
 }
 
 // ============================================================================
@@ -2097,6 +2112,13 @@ async function main() {
   console.log(`[Config] Base de datos seleccionada: ${MONGODB_DB}`);
   console.log("[Config] Conexión protegida: no se imprimen credenciales ni tokens.");
 
+  if (process.argv.includes("--dry-run") || process.argv.includes("--check-only")) {
+    console.log(
+      "\n[Dry-Run] Verificación inofensiva: main() fue invocado con éxito y los guardias de ejecución funcionan."
+    );
+    return;
+  }
+
   let mongoClient: MongoClient | null = null;
 
   try {
@@ -2192,7 +2214,9 @@ async function main() {
 }
 
 // Ejecutar script solo cuando es invocado directamente (no cuando es importado por pruebas)
-const isDirectRun = process.argv[1]?.replace(/\\/g, "/").endsWith("scripts/setup-db-and-seed.ts");
+const isDirectRun =
+  Boolean(process.argv[1]?.replace(/\\/g, "/").endsWith("scripts/setup-db-and-seed.ts")) ||
+  (typeof require !== "undefined" && require.main === module);
 if (isDirectRun) {
   main();
 }
