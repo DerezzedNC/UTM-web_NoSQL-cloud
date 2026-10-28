@@ -1,6 +1,6 @@
 import { registroIncidenciaSchema } from "@/lib/incidencias/registro-schema";
-
-let consecutivo = 4;
+import { INCIDENCIAS_INICIALES } from "@/lib/incidencias/mock-data";
+import type { IncidenciaCampus } from "@/lib/incidencias/types";
 
 export async function POST(request: Request) {
   const role = request.headers.get("x-user-role");
@@ -11,7 +11,12 @@ export async function POST(request: Request) {
     );
   }
 
-  const body: unknown = await request.json();
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return Response.json({ error: "El cuerpo debe ser JSON válido." }, { status: 400 });
+  }
   const result = registroIncidenciaSchema.safeParse(body);
 
   if (!result.success) {
@@ -21,9 +26,29 @@ export async function POST(request: Request) {
     );
   }
 
-  const folio = `INC-${new Date().getFullYear()}-${String(consecutivo++).padStart(4, "0")}`;
+  const now = new Date().toISOString();
+  const year = new Date().getFullYear();
+  const nextNumber = INCIDENCIAS_INICIALES.length + 1;
+  const folio = `INC-${year}-${String(nextNumber).padStart(4, "0")}`;
+  const created: IncidenciaCampus = {
+    _id: `mock-${crypto.randomUUID()}`,
+    folio,
+    ...result.data,
+    estado: "abierta" as const,
+    horas_invertidas: 0,
+    fecha_creacion: now,
+    historial_seguimiento: [{
+      fecha: now,
+      autor: result.data.reportante.nombre,
+      estado_nuevo: "abierta" as const,
+      horas_sumadas: 0,
+      comentario: "Incidencia creada.",
+    }],
+    evidencias_adjuntas: [],
+  };
+  INCIDENCIAS_INICIALES.push(created);
   return Response.json(
-    { data: { _id: `mock-${crypto.randomUUID()}`, folio, ...result.data } },
+    { data: created },
     { status: 201 },
   );
 }

@@ -10,7 +10,7 @@ export default function PortalPage() {
 
   useEffect(() => {
     if (!hydrated || !session) return;
-    const destination = session.role === "admin" ? "/" : session.role === "directiva" ? "/analitica" : session.role === "reportante" ? "/mis-incidencias" : "/incidencias";
+    const destination = session.role === "admin" ? "/incidencias" : session.role === "directiva" ? "/analitica" : "/incidencias";
     router.replace(destination);
   }, [hydrated, router, session]);
 

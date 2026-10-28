@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { MongoClient, ObjectId } from "mongodb";
+import { ObjectId } from "mongodb";
+import { getDb } from "@/lib/mongodb";
 import {
   MIME_PERMITIDOS,
   MAX_PESO_KB,
@@ -10,6 +11,7 @@ import {
   getIncidencia,
   type EvidenciaAdjunta,
 } from "@/lib/incidencias/mock-data";
+import { hasPermission, type FrontendRole } from "@/lib/rbac";
 
 type TipoMimePermitido = (typeof MIME_PERMITIDOS)[number];
 
@@ -21,12 +23,9 @@ async function obtenerColeccionMongo() {
   const uri = process.env.MONGODB_URI;
   if (!uri || uri.trim() === "") return null;
 
-  const dbName = process.env.MONGODB_DB || "utm_desk_db";
-  const client = new MongoClient(uri);
-  await client.connect();
+  const db = await getDb();
   return {
-    client,
-    collection: client.db(dbName).collection("incidencias_campus"),
+    collection: db.collection("incidencias_campus"),
   };
 }
 
@@ -57,10 +56,16 @@ export async function GET(
       }
 
       const evidenciasConUrl = await Promise.all(
-        (doc.evidencias_adjuntas || []).map(async (ev: EvidenciaAdjunta) => ({
-          ...ev,
-          url_firmada: await generarUrlFirmada(ev.storage_key),
-        }))
+        (doc.evidencias_adjuntas || []).map(async (ev: EvidenciaAdjunta) => {
+          const key = ev.storage_key || ev.url_storage;
+          const urlFirmada = key ? await generarUrlFirmada(key) : null;
+          return {
+            ...ev,
+            storage_key: key,
+            url_storage: urlFirmada || ev.url_storage || key,
+            url_firmada: urlFirmada,
+          };
+        })
       );
 
       return NextResponse.json(
@@ -78,10 +83,16 @@ export async function GET(
     }
 
     const evidenciasConUrl = await Promise.all(
-      incidenciaLocal.evidencias_adjuntas.map(async (ev) => ({
-        ...ev,
-        url_firmada: await generarUrlFirmada(ev.storage_key),
-      }))
+      incidenciaLocal.evidencias_adjuntas.map(async (ev) => {
+        const key = ev.storage_key || ev.url_storage;
+        const urlFirmada = key ? await generarUrlFirmada(key) : null;
+        return {
+          ...ev,
+          storage_key: key,
+          url_storage: urlFirmada || ev.url_storage || key,
+          url_firmada: urlFirmada,
+        };
+      })
     );
 
     return NextResponse.json(
@@ -92,8 +103,6 @@ export async function GET(
     const mensaje =
       error instanceof Error ? error.message : "Error al consultar evidencias";
     return NextResponse.json({ error: mensaje }, { status: 400 });
-  } finally {
-    if (mongoConn) await mongoConn.client.close();
   }
 }
 
@@ -102,6 +111,14 @@ export async function POST(
   context: { params: Promise<{ id: string }> }
 ) {
   const { id } = await context.params;
+  const role = request.headers.get("x-user-role") as FrontendRole | null;
+  if (role && !hasPermission(role, "evidencia:upload")) {
+    return NextResponse.json(
+      { error: "Tu rol no puede subir evidencias." },
+      { status: 403 }
+    );
+  }
+
   let mongoConn: Awaited<ReturnType<typeof obtenerColeccionMongo>> = null;
 
   try {
@@ -234,19 +251,29 @@ export async function POST(
 
       const evidenciasConUrl = await Promise.all(
         (resultado?.evidencias_adjuntas || []).map(
-          async (ev: EvidenciaAdjunta) => ({
-            ...ev,
-            url_firmada: await generarUrlFirmada(ev.storage_key),
-          })
+          async (ev: EvidenciaAdjunta) => {
+            const key = ev.storage_key || ev.url_storage;
+            const firmada = key ? await generarUrlFirmada(key) : null;
+            return {
+              ...ev,
+              storage_key: key,
+              url_storage: firmada || ev.url_storage || key,
+              url_firmada: firmada,
+            };
+          }
         )
       );
 
       return NextResponse.json(
         {
-          data: { ...subdocumentoMongo, url_firmada: urlFirmada },
+          data: {
+            ...subdocumentoMongo,
+            url_storage: urlFirmada || storageKey,
+            url_firmada: urlFirmada,
+          },
           evidencias_adjuntas: evidenciasConUrl,
         },
-        { status: 200 }
+        { status: 201 }
       );
     }
 
@@ -255,7 +282,8 @@ export async function POST(
       nombre_archivo: nombreArchivo,
       tipo_mime: tipoMime,
       peso_kb: pesoKb,
-      fecha_carga: new Date().toLocaleString("es-MX"),
+      fecha_carga: new Date().toISOString(),
+      url_storage: urlFirmada || storageKey,
       storage_key: storageKey,
       url_firmada: urlFirmada,
     };
@@ -267,7 +295,7 @@ export async function POST(
         data: evidenciaLocal,
         evidencias_adjuntas: incidenciaLocal.evidencias_adjuntas,
       },
-      { status: 200 }
+      { status: 201 }
     );
   } catch (error) {
     const mensaje =
@@ -276,7 +304,5 @@ export async function POST(
         : "Error interno al procesar la evidencia";
     console.error("Error en POST evidencias:", error);
     return NextResponse.json({ error: mensaje }, { status: 400 });
-  } finally {
-    if (mongoConn) await mongoConn.client.close();
   }
 }

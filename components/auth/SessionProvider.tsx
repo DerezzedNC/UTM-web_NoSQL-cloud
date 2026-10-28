@@ -15,6 +15,7 @@ type SessionContextValue = {
   session: Session | null;
   hydrated: boolean;
   signIn: (email: string, password: string) => string | null;
+  switchRole: (role: FrontendRole) => void;
   signOut: () => void;
 };
 
@@ -33,15 +34,12 @@ const SessionContext = createContext<SessionContextValue | null>(null);
 function canAccess(role: FrontendRole, pathname: string) {
   if (role === "admin") return true;
   if (pathname === "/") return false;
-  if (pathname.startsWith("/usuarios")) return false;
-  if (pathname.startsWith("/activos")) return role === "tecnico" || role === "coordinador";
-  if (pathname.startsWith("/monitoreo")) return role === "tecnico" || role === "coordinador";
-  if (pathname.startsWith("/ajustes")) return false;
-  if (pathname.startsWith("/auditoria")) return false;
-  if (pathname.startsWith("/notificaciones")) return true;
+  if (pathname.startsWith("/mis-incidencias")) return true;
+  if (pathname.startsWith("/incidencias/nueva")) return role === "reportante";
+  if (pathname.startsWith("/analitica")) return role === "directiva";
   if (role === "directiva") return pathname.startsWith("/analitica") || pathname.startsWith("/incidencias");
-  if (role === "reportante") return pathname.startsWith("/mis-incidencias") || pathname.startsWith("/incidencias/nueva") || pathname.startsWith("/incidencias/");
-  return pathname.startsWith("/incidencias") || pathname.startsWith("/analitica");
+  if (role === "reportante") return pathname.startsWith("/incidencias");
+  return pathname.startsWith("/incidencias");
 }
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
@@ -96,6 +94,12 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       setSession(next);
       router.replace("/portal");
       return null;
+    },
+    switchRole: (role) => {
+      const next = { role, ...roleProfiles[role] };
+      window.localStorage.setItem(SESSION_KEY, JSON.stringify(next));
+      setSession(next);
+      router.replace("/portal");
     },
     signOut: () => {
       window.localStorage.removeItem(SESSION_KEY);

@@ -1,10 +1,8 @@
 import { Field, inputClass } from "@/components/ui/Field";
-import { CATEGORIA_META, PRIORIDAD_META } from "@/lib/incidencias/constants";
+import { PRIORIDAD_META } from "@/lib/incidencias/constants";
 import {
-  CATEGORIAS,
   PRIORIDADES,
   type BorradorIncidencia,
-  type CategoriaIncidencia,
   type Prioridad,
 } from "@/lib/incidencias/types";
 
@@ -88,45 +86,6 @@ export function CamposUniversales({
         ) : null}
       </fieldset>
 
-      <fieldset>
-        <legend className="mb-2 text-sm font-medium text-slate-800">
-          Categoría
-        </legend>
-        <div className="grid gap-3 md:grid-cols-3">
-          {CATEGORIAS.map((categoria) => (
-            <label
-              key={categoria}
-              className={`cursor-pointer rounded-xl border p-4 transition ${
-                value.categoria === categoria
-                  ? "border-teal-600 bg-teal-50 ring-2 ring-teal-100"
-                  : "border-slate-200 bg-slate-50 hover:border-slate-300"
-              }`}
-            >
-              <input
-                type="radio"
-                name="categoria"
-                value={categoria}
-                checked={value.categoria === categoria}
-                onChange={() =>
-                  onChange("categoria", categoria as CategoriaIncidencia)
-                }
-                className="sr-only"
-              />
-              <span className="block text-sm font-semibold text-slate-900">
-                {CATEGORIA_META[categoria].etiqueta}
-              </span>
-              <span className="mt-1 block text-xs text-slate-500">
-                {CATEGORIA_META[categoria].resumen}
-              </span>
-            </label>
-          ))}
-        </div>
-        {errors.categoria ? (
-          <p className="mt-2 text-sm text-rose-700" role="alert">
-            {errors.categoria}
-          </p>
-        ) : null}
-      </fieldset>
     </div>
   );
 }

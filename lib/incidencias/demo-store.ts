@@ -35,9 +35,9 @@ export function createDemoIncidencia(payload: RegistroIncidenciaPayload) {
   const detalle = payload.categoria === "computo_redes"
     ? {
         direccion_ip: payload.detalle_especifico.direccion_ip,
-        vlan: String(payload.detalle_especifico.vlan),
+        vlan: payload.detalle_especifico.vlan,
         puerto_uplink: payload.detalle_especifico.puerto_uplink,
-        equipos_afectados: [String(payload.detalle_especifico.equipos_afectados)],
+        equipos_afectados: payload.detalle_especifico.equipos_afectados,
       }
     : payload.detalle_especifico;
   const incidencia: IncidenciaDetalle = {
@@ -47,6 +47,7 @@ export function createDemoIncidencia(payload: RegistroIncidenciaPayload) {
     descripcion: payload.descripcion,
     prioridad: payload.prioridad,
     estado: "abierta",
+    fecha_creacion: new Date().toISOString(),
     categoria: payload.categoria,
     tags: payload.tags,
     horas_invertidas: 0,
@@ -56,11 +57,16 @@ export function createDemoIncidencia(payload: RegistroIncidenciaPayload) {
       id_usuario: payload.reportante.id_usuario,
       nombre: payload.reportante.nombre,
       correo: payload.reportante.correo,
-      cargo: payload.reportante.tipo,
+      rol: payload.reportante.rol,
     },
-    tecnico_asignado: null,
     detalle_especifico: detalle,
-    historial_seguimiento: [],
+    historial_seguimiento: [{
+      fecha: new Date().toISOString(),
+      autor: payload.reportante.nombre,
+      estado_nuevo: "abierta",
+      horas_sumadas: 0,
+      comentario: "Incidencia creada.",
+    }],
   };
   const incidencias = [...readDemoIncidencias(), incidencia];
   writeDemoIncidencias(incidencias);
@@ -89,7 +95,7 @@ export function updateDemoStatus(
   return updateDemoIncidencia(id, (incidencia) => {
     incidencia.estado = estado;
     incidencia.horas_invertidas += horas;
-    if (estado === "resuelta") incidencia.fecha_resolucion = new Date().toISOString();
+    if (estado === "resuelta" || estado === "cerrada") incidencia.fecha_resolucion = new Date().toISOString();
     else delete incidencia.fecha_resolucion;
     incidencia.historial_seguimiento.unshift({
       fecha: new Date().toLocaleString("es-MX"),

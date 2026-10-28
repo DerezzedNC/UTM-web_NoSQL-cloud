@@ -6,30 +6,40 @@ export type FrontendRole =
   | "reportante";
 
 export type Permission =
-  | "ticket:create"
-  | "dispatch:assign"
-  | "network:poe_reboot"
-  | "ticket:update"
-  | "ticket:tag"
-  | "evidence:upload"
-  | "ticket:close";
+  | "incidencia:create"
+  | "evidencia:upload"
+  | "incidencia:update"
+  | "incidencia:tags"
+  | "incidencia:read"
+  | "analitica:read";
+
+export const ROLE_LABELS: Record<FrontendRole, string> = {
+  admin: "Administrador",
+  directiva: "Directiva",
+  coordinador: "Coordinador",
+  tecnico: "Técnico",
+  reportante: "Reportante",
+};
 
 const permissions: Record<FrontendRole, readonly Permission[]> = {
   admin: [
-    "ticket:create",
-    "dispatch:assign",
-    "network:poe_reboot",
-    "ticket:update",
-    "ticket:tag",
-    "evidence:upload",
-    "ticket:close",
+    "incidencia:create",
+    "evidencia:upload",
+    "incidencia:update",
+    "incidencia:tags",
+    "incidencia:read",
+    "analitica:read",
   ],
-  directiva: [],
-  coordinador: ["dispatch:assign", "ticket:tag", "ticket:close"],
-  tecnico: ["network:poe_reboot", "ticket:update", "ticket:tag", "evidence:upload"],
-  reportante: ["ticket:create", "evidence:upload"],
+  directiva: ["incidencia:read", "analitica:read"],
+  coordinador: ["incidencia:read", "incidencia:update", "incidencia:tags"],
+  tecnico: ["incidencia:read", "incidencia:update", "incidencia:tags", "evidencia:upload"],
+  reportante: ["incidencia:create", "incidencia:read", "evidencia:upload"],
 };
 
 export function hasPermission(role: FrontendRole, permission: Permission) {
   return permissions[role].includes(permission);
+}
+
+export function canCloseTicket(role: FrontendRole) {
+  return role === "admin" || role === "coordinador";
 }
