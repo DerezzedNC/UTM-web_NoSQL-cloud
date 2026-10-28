@@ -84,7 +84,7 @@ El sistema implementa 5 roles institucionales con permisos estrictamente diferen
 | **Reportante** | `reportante@utm.edu.mx` | `DOC-1042` / `ADM-0422` / `EST-2024` | Portal de autoservicio (`/mis-incidencias`), alta de reportes (`/incidencias/nueva`). |
 
 > **Contraseña Demo en Frontend:** `utm-demo`  
-> **Contraseña Sembrada en MongoDB:** Definida por `SEED_DEFAULT_PASSWORD` (por defecto: `UtmDesk2026!`).
+> **Contraseña Sembrada en MongoDB:** Definida mediante la variable de entorno `SEED_DEFAULT_PASSWORD`. Cada desarrollador debe configurar su propia contraseña en `.env.local` antes de ejecutar la inicialización de la base de datos.
 
 ---
 
@@ -178,9 +178,9 @@ MONGODB_DB="utm_desk_db"
 UPSTASH_REDIS_REST_URL="https://<tu-endpoint>.upstash.io"
 UPSTASH_REDIS_REST_TOKEN="<tu-token-rest>"
 
-# Autenticación y Semillas
+# Autenticación y Semillas (cada desarrollador debe configurar su propia SEED_DEFAULT_PASSWORD en .env.local)
 AUTH_SECRET="<clave-secreta-aleatoria-de-32-caracteres>"
-SEED_DEFAULT_PASSWORD="UtmDesk2026!"
+SEED_DEFAULT_PASSWORD="<tu-contraseña-segura-para-usuarios-sembrados>"
 
 # Supabase Storage (Opcional en fase inicial)
 SUPABASE_URL=""

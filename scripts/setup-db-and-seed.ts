@@ -28,7 +28,7 @@ const MONGODB_URI = process.env.MONGODB_URI;
 const MONGODB_DB = process.env.MONGODB_DB || "utm_desk_db";
 const REDIS_URL = process.env.UPSTASH_REDIS_REST_URL;
 const REDIS_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
-const SEED_DEFAULT_PASSWORD = process.env.SEED_DEFAULT_PASSWORD || "UtmDesk2026!";
+const SEED_DEFAULT_PASSWORD = process.env.SEED_DEFAULT_PASSWORD;
 const ANIO_ACTUAL = 2026;
 
 // ============================================================================
@@ -416,6 +416,9 @@ interface UsuarioSeed {
 
 async function seedUsuarios(db: Db): Promise<{ inserted: number; skipped: number }> {
   console.log("[MongoDB] Procesando sembrado de usuarios RBAC...");
+  if (!SEED_DEFAULT_PASSWORD) {
+    throw new Error("[Seguridad] SEED_DEFAULT_PASSWORD no está configurada en el entorno.");
+  }
   const colUsuarios = db.collection<UsuarioSeed>("usuarios");
   const hashedPw = await bcrypt.hash(SEED_DEFAULT_PASSWORD, 10);
   const now = new Date();
@@ -2099,6 +2102,7 @@ async function main() {
   if (!MONGODB_URI) missingVars.push("MONGODB_URI");
   if (!REDIS_URL) missingVars.push("UPSTASH_REDIS_REST_URL");
   if (!REDIS_TOKEN) missingVars.push("UPSTASH_REDIS_REST_TOKEN");
+  if (!SEED_DEFAULT_PASSWORD) missingVars.push("SEED_DEFAULT_PASSWORD");
 
   if (missingVars.length > 0) {
     console.error("\n[ERROR FATAL] Faltan variables de entorno requeridas en .env.local:");

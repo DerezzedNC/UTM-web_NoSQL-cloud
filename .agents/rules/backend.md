@@ -1,9 +1,5 @@
 ---
 trigger: always_on
----
-
----
-trigger: always_on
 description: "Reglas de arquitectura, seguridad, bases de datos y verificación para UTM Desk NoSQL Cloud."
 ---
 
