@@ -6,6 +6,7 @@ export const MIME_PERMITIDOS = ["image/png", "image/jpeg", "application/pdf"] as
 export const MAX_PESO_KB = 5120; // 5 MB (RNF-07)
 
 let supabaseInstance: SupabaseClient | null = null;
+let bucketVerified = false;
 
 /**
  * Normaliza SUPABASE_URL por si tiene comillas, barras finales o rutas de dashboard/storage
@@ -24,6 +25,13 @@ function normalizarSupabaseUrl(rawUrl: string): string {
   return urlObj.origin;
 }
 
+export function hasSupabaseConfigured(): boolean {
+  return Boolean(
+    process.env.SUPABASE_URL?.trim() &&
+      process.env.SUPABASE_SERVICE_ROLE_KEY?.trim(),
+  );
+}
+
 export function getSupabaseClient(): SupabaseClient {
   if (supabaseInstance) {
     return supabaseInstance;
@@ -34,7 +42,7 @@ export function getSupabaseClient(): SupabaseClient {
 
   if (!rawUrl || !rawKey) {
     throw new Error(
-      "Faltan las variables SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY en .env.local"
+      "Faltan las variables SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY en .env.local",
     );
   }
 
@@ -49,6 +57,24 @@ export function getSupabaseClient(): SupabaseClient {
   });
 
   return supabaseInstance;
+}
+
+async function ensureBucketExists(supabase: SupabaseClient) {
+  if (bucketVerified) return;
+  try {
+    const { data: buckets } = await supabase.storage.listBuckets();
+    const exists = buckets?.some((b) => b.name === BUCKET_EVIDENCIAS);
+    if (!exists) {
+      await supabase.storage.createBucket(BUCKET_EVIDENCIAS, {
+        public: false,
+        fileSizeLimit: 5 * 1024 * 1024,
+        allowedMimeTypes: ["image/png", "image/jpeg", "application/pdf"],
+      });
+    }
+    bucketVerified = true;
+  } catch {
+    // Continuar e intentar subir directamente
+  }
 }
 
 export function extraerRutaInternaBucket(storageKey: string): string {
@@ -69,10 +95,10 @@ export async function subirArchivoEvidencia(params: {
   const { archivoBuffer, nombreArchivo, tipoMime, categoria, folio } = params;
 
   const supabase = getSupabaseClient();
+  await ensureBucketExists(supabase);
+
   const anio = new Date().getFullYear();
-  const nombreLimpio = nombreArchivo
-    .trim()
-    .replace(/[^a-zA-Z0-9._-]/g, "_");
+  const nombreLimpio = nombreArchivo.trim().replace(/[^a-zA-Z0-9._-]/g, "_");
   const rutaInterna = `${anio}/${categoria}/${folio}/${nombreLimpio}`;
   const storageKey = `${BUCKET_EVIDENCIAS}/${rutaInterna}`;
 
@@ -97,6 +123,7 @@ export async function subirArchivoEvidencia(params: {
 }
 
 export async function generarUrlFirmada(storageKey: string): Promise<string | null> {
+  if (!hasSupabaseConfigured() || !storageKey) return null;
   try {
     const supabase = getSupabaseClient();
     const rutaInterna = extraerRutaInternaBucket(storageKey);

@@ -15,7 +15,12 @@ export function armarPayload(
     tags: [] as string[],
     ubicacion: borrador.ubicacion,
     reportante: borrador.reportante,
-    evidencias: borrador.evidencias,
+    evidencias: borrador.evidencias.map((ev) => ({
+      nombre_archivo: ev.nombre_archivo,
+      tipo_mime: ev.tipo_mime as "image/png" | "image/jpeg" | "application/pdf",
+      peso_kb: ev.peso_kb,
+      ...(ev.contenido_base64 ? { contenido_base64: ev.contenido_base64 } : {}),
+    })),
   };
 
   if (borrador.categoria === "computo_redes") {

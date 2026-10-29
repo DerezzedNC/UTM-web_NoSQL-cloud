@@ -25,41 +25,82 @@ type SessionContextValue = {
 const SESSION_KEY = "utm-desk-session";
 const roleProfiles: Record<FrontendRole, Omit<Session, "role">> = {
   admin: {
-    id_usuario: "u-admin-mendez",
+    id_usuario: "ADM-0311",
     rol_institucional: "Administrativo",
-    name: "Ing. Carlos Méndez",
-    department: "Administración de Infraestructura",
-    email: "admin@utm.edu.mx",
+    name: "Carlos Méndez Cetina",
+    department: "Dirección de Tecnologías de la Información",
+    email: "carlos.mendez@utm.edu.mx",
   },
   directiva: {
-    id_usuario: "u-directiva-arizmendi",
+    id_usuario: "DIR-0014",
     rol_institucional: "Administrativo",
-    name: "Dra. Beatriz Arizmendi",
-    department: "Dirección General de Tecnología",
-    email: "directiva@utm.edu.mx",
+    name: "Dra. Carmen Solís Pech",
+    department: "Rectoría UTM",
+    email: "carmen.solis@utm.edu.mx",
   },
   coordinador: {
-    id_usuario: "u-coord-valenzuela",
+    id_usuario: "CRD-0105",
     rol_institucional: "Administrativo",
-    name: "Lic. Mariana Valenzuela",
-    department: "Coordinación de Operaciones",
-    email: "coordinador@utm.edu.mx",
+    name: "Ing. Luis Briceño Tun",
+    department: "Coordinación de Operaciones de Campus",
+    email: "luis.briceno@utm.edu.mx",
   },
   tecnico: {
-    id_usuario: "u-tec-morales",
+    id_usuario: "TEC-0205",
     rol_institucional: "Administrativo",
-    name: "Ing. Carlos Morales",
-    department: "Infraestructura y TI",
-    email: "tecnico@utm.edu.mx",
+    name: "Ing. Roberto Pech Moo",
+    department: "Cómputo y Telecomunicaciones",
+    email: "roberto.pech@utm.edu.mx",
   },
   reportante: {
-    id_usuario: "u-carlos-mendez",
+    id_usuario: "DOC-1042",
     rol_institucional: "Docente",
-    name: "Carlos Méndez",
-    department: "Docencia · Campus Central",
-    email: "reportante@utm.edu.mx",
+    name: "Mtro. Carlos Méndez Cetina",
+    department: "División de Tecnologías de la Información",
+    email: "carlos.docente@utm.edu.mx",
   },
 };
+
+const additionalAccounts: Record<string, Session> = {
+  "admin@utm.edu.mx": { role: "admin", ...roleProfiles.admin },
+  "directiva@utm.edu.mx": { role: "directiva", ...roleProfiles.directiva },
+  "coordinador@utm.edu.mx": { role: "coordinador", ...roleProfiles.coordinador },
+  "tecnico@utm.edu.mx": { role: "tecnico", ...roleProfiles.tecnico },
+  "reportante@utm.edu.mx": { role: "reportante", ...roleProfiles.reportante },
+  "miguel.balam@utm.edu.mx": {
+    id_usuario: "TEC-0412",
+    role: "tecnico",
+    rol_institucional: "Administrativo",
+    name: "Téc. Miguel Balam Dzib",
+    department: "Mantenimiento e Infraestructura Física",
+    email: "miguel.balam@utm.edu.mx",
+  },
+  "sofia.ortiz@utm.edu.mx": {
+    id_usuario: "TEC-0518",
+    role: "tecnico",
+    rol_institucional: "Administrativo",
+    name: "Lic. Sofía Ortiz Lara",
+    department: "Servicios Escolares y Plataformas Académicas",
+    email: "sofia.ortiz@utm.edu.mx",
+  },
+  "laura.canto@utm.edu.mx": {
+    id_usuario: "ADM-0422",
+    role: "reportante",
+    rol_institucional: "Administrativo",
+    name: "Lic. Laura Canto Várguez",
+    department: "Servicios Escolares",
+    email: "laura.canto@utm.edu.mx",
+  },
+  "alejandro.perez@utm.edu.mx": {
+    id_usuario: "EST-2024",
+    role: "reportante",
+    rol_institucional: "Estudiante",
+    name: "Alejandro Pérez Noh",
+    department: "Ingeniería en Desarrollo de Software",
+    email: "alejandro.perez@utm.edu.mx",
+  },
+};
+
 const DEMO_PASSWORD = "utm-demo";
 
 const SessionContext = createContext<SessionContextValue | null>(null);
@@ -88,13 +129,18 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         try {
           const parsed = JSON.parse(stored) as Partial<Session> & { role?: FrontendRole };
           if (parsed.role && roleProfiles[parsed.role]) {
-            const normalized: Session = {
-              role: parsed.role,
-              ...roleProfiles[parsed.role],
-              ...parsed,
-              id_usuario: parsed.id_usuario ?? roleProfiles[parsed.role].id_usuario,
-              rol_institucional: parsed.rol_institucional ?? roleProfiles[parsed.role].rol_institucional,
-            };
+            const legacyIds = new Set(["u-carlos-mendez", "u-tec-morales", "u-coord-valenzuela", "u-directiva-arizmendi", "u-admin-mendez"]);
+            const useProfileDefault = !parsed.id_usuario || legacyIds.has(parsed.id_usuario);
+            const normalized: Session = useProfileDefault
+              ? { role: parsed.role, ...roleProfiles[parsed.role] }
+              : {
+                  role: parsed.role,
+                  ...roleProfiles[parsed.role],
+                  ...parsed,
+                  id_usuario: parsed.id_usuario!,
+                  rol_institucional: parsed.rol_institucional ?? roleProfiles[parsed.role].rol_institucional,
+                };
+            window.localStorage.setItem(SESSION_KEY, JSON.stringify(normalized));
             setSession(normalized);
           } else {
             window.localStorage.removeItem(SESSION_KEY);
@@ -128,10 +174,20 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     hydrated,
     signIn: (email, password) => {
       const normalizedEmail = email.trim().toLowerCase();
+      if (password !== DEMO_PASSWORD) {
+        return "Correo o contraseña incorrectos.";
+      }
+      if (additionalAccounts[normalizedEmail]) {
+        const next = additionalAccounts[normalizedEmail];
+        window.localStorage.setItem(SESSION_KEY, JSON.stringify(next));
+        setSession(next);
+        router.replace("/portal");
+        return null;
+      }
       const role = (Object.keys(roleProfiles) as FrontendRole[]).find(
         (candidate) => roleProfiles[candidate].email === normalizedEmail,
       );
-      if (!role || password !== DEMO_PASSWORD) {
+      if (!role) {
         return "Correo o contraseña incorrectos.";
       }
       const next = { role, ...roleProfiles[role] };

@@ -46,12 +46,6 @@ export const PRIORIDAD_META: Record<
 
 export const TECNICOS_DISPONIBLES: TecnicoAsignado[] = [
   {
-    id_usuario: "u-tec-morales",
-    nombre: "Ing. Carlos Morales",
-    correo: "tecnico@utm.edu.mx",
-    area: "computo_redes",
-  },
-  {
     id_usuario: "TEC-0205",
     nombre: "Ing. Roberto Pech Moo",
     correo: "roberto.pech@utm.edu.mx",
@@ -82,10 +76,10 @@ export const BORRADOR_INICIAL: BorradorIncidencia = {
     aula_laboratorio: "",
   },
   reportante: {
-    id_usuario: "u-carlos-mendez",
-    nombre: "Carlos Méndez",
+    id_usuario: "DOC-1042",
+    nombre: "Mtro. Carlos Méndez Cetina",
     rol: "Docente",
-    correo: "reportante@utm.edu.mx",
+    correo: "carlos.docente@utm.edu.mx",
   },
   evidencias: [],
   detalle_computo: {

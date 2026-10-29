@@ -453,16 +453,39 @@ export default function IncidenciaDetallePage({ params }: { params: Promise<{ id
 
             <OperationCard title="Evidencia adjunta en el reporte">
               {ticket.evidencias_adjuntas.length > 0 ? (
-                <ul className="mt-4 space-y-2 text-xs">
+                <ul className="mt-4 space-y-3 text-xs">
                   {ticket.evidencias_adjuntas.map((item) => (
-                    <li key={item.url_storage} className="rounded-lg bg-slate-50 p-3">
+                    <li key={item.url_storage} className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-3">
+                      {item.tipo_mime.startsWith("image/") && item.url_firmada ? (
+                        <a
+                          href={item.url_firmada}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mb-2.5 block overflow-hidden rounded-lg border border-slate-200 bg-white"
+                        >
+                          <img
+                            src={item.url_firmada}
+                            alt={item.nombre_archivo}
+                            className="max-h-56 w-full object-contain transition hover:scale-[1.02]"
+                          />
+                        </a>
+                      ) : null}
                       <p className="font-semibold text-slate-900">{item.nombre_archivo}</p>
-                      <p className="mt-1 text-slate-500">
+                      <p className="mt-0.5 text-slate-500">
                         {item.tipo_mime} · {item.peso_kb} KB
                       </p>
-                      <a href={`#${item.url_storage}`} className="mt-1 block truncate text-teal-700 hover:underline">
-                        {item.url_storage}
-                      </a>
+                      {item.url_firmada ? (
+                        <a
+                          href={item.url_firmada}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-2 inline-flex items-center gap-1 rounded-lg bg-teal-50 px-2.5 py-1.5 font-semibold text-teal-800 hover:bg-teal-100"
+                        >
+                          {item.tipo_mime === "application/pdf" ? "Abrir documento PDF ↗" : "Ver imagen completa ↗"}
+                        </a>
+                      ) : (
+                        <p className="mt-1 truncate font-mono text-[11px] text-slate-400">{item.url_storage}</p>
+                      )}
                     </li>
                   ))}
                 </ul>

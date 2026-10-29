@@ -111,6 +111,8 @@ export type BorradorEvidencia = {
   nombre_archivo: string;
   tipo_mime: string;
   peso_kb: number;
+  contenido_base64?: string;
+  preview_url?: string;
 };
 
 export type BorradorIncidencia = {
