@@ -23,10 +23,18 @@ async function obtenerColeccionMongo() {
   const uri = process.env.MONGODB_URI;
   if (!uri || uri.trim() === "") return null;
 
-  const db = await getDb();
-  return {
-    collection: db.collection("incidencias_campus"),
-  };
+  try {
+    const db = await getDb();
+    return {
+      collection: db.collection("incidencias_campus"),
+    };
+  } catch (err) {
+    console.warn(
+      "[evidencias] No se pudo conectar a MongoDB Atlas, usando respaldo local:",
+      err instanceof Error ? err.message : err
+    );
+    return null;
+  }
 }
 
 export async function GET(

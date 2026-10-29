@@ -8,6 +8,7 @@ export type FrontendRole =
 export type Permission =
   | "incidencia:create"
   | "incidencia:triage"
+  | "evidencia:upload"
   | "incidencia:update"
   | "incidencia:tags"
   | "incidencia:read"
@@ -25,6 +26,7 @@ const permissions: Record<FrontendRole, readonly Permission[]> = {
   admin: [
     "incidencia:create",
     "incidencia:triage",
+    "evidencia:upload",
     "incidencia:update",
     "incidencia:tags",
     "incidencia:read",
@@ -32,8 +34,8 @@ const permissions: Record<FrontendRole, readonly Permission[]> = {
   ],
   directiva: ["incidencia:read", "analitica:read"],
   coordinador: ["incidencia:read", "incidencia:triage", "incidencia:update", "incidencia:tags"],
-  tecnico: ["incidencia:read", "incidencia:update"],
-  reportante: ["incidencia:create", "incidencia:read"],
+  tecnico: ["incidencia:read", "incidencia:update", "evidencia:upload"],
+  reportante: ["incidencia:create", "incidencia:read", "evidencia:upload"],
 };
 
 export function hasPermission(role: FrontendRole, permission: Permission) {
