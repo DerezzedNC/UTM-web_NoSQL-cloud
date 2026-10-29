@@ -29,6 +29,12 @@ function buildIdFilter(id: string): Record<string, unknown> {
   };
 }
 
+function normalizeEstado(val: unknown): IncidenciaCampus["estado"] {
+  if (val === "en_proceso") return "en proceso";
+  if (val === "en_espera") return "en espera";
+  return (val as IncidenciaCampus["estado"]) || "abierta";
+}
+
 async function formatIncidencia(doc: Record<string, unknown>): Promise<IncidenciaCampus> {
   const reportanteRaw = (doc.reportante ?? {}) as Record<string, unknown>;
   const ubicacionRaw = (doc.ubicacion ?? {}) as Record<string, unknown>;
@@ -48,7 +54,7 @@ async function formatIncidencia(doc: Record<string, unknown>): Promise<Incidenci
             tipo_mime: String(eObj.tipo_mime ?? ""),
             peso_kb: Number(eObj.peso_kb ?? 0),
             storage_key: storageKey,
-            url_storage: eObj.url_storage ? String(eObj.url_storage) : undefined,
+            url_storage: eObj.url_storage ? String(eObj.url_storage) : storageKey,
             url_firmada: urlFirmada ?? undefined,
             fecha_carga:
               eObj.fecha_carga instanceof Date
@@ -66,7 +72,7 @@ async function formatIncidencia(doc: Record<string, unknown>): Promise<Incidenci
     descripcion: String(doc.descripcion ?? ""),
     prioridad: doc.prioridad as IncidenciaCampus["prioridad"],
     categoria: doc.categoria as IncidenciaCampus["categoria"],
-    estado: doc.estado as IncidenciaCampus["estado"],
+    estado: normalizeEstado(doc.estado),
     horas_invertidas: Number(doc.horas_invertidas ?? 0),
     fecha_creacion:
       doc.fecha_creacion instanceof Date
@@ -83,9 +89,9 @@ async function formatIncidencia(doc: Record<string, unknown>): Promise<Incidenci
     reportante: {
       id_usuario: String(reportanteRaw.id_usuario ?? ""),
       nombre: String(reportanteRaw.nombre ?? ""),
-      rol_institucional: reportanteRaw.rol_institucional as IncidenciaCampus["reportante"]["rol_institucional"],
+      rol_institucional: (reportanteRaw.rol_institucional ?? reportanteRaw.rol ?? "Docente") as IncidenciaCampus["reportante"]["rol_institucional"],
+      rol: (reportanteRaw.rol ?? reportanteRaw.rol_institucional ?? "Docente") as IncidenciaCampus["reportante"]["rol"],
       correo: String(reportanteRaw.correo ?? ""),
-      ...(reportanteRaw.rol ? { rol: reportanteRaw.rol as IncidenciaCampus["reportante"]["rol_institucional"] } : {}),
     },
     ubicacion: {
       edificio: String(ubicacionRaw.edificio ?? ""),
@@ -103,7 +109,7 @@ async function formatIncidencia(doc: Record<string, unknown>): Promise<Incidenci
                 ? hObj.fecha.toISOString()
                 : String(hObj.fecha ?? ""),
             autor: String(hObj.autor ?? ""),
-            estado_nuevo: hObj.estado_nuevo as IncidenciaCampus["estado"],
+            estado_nuevo: normalizeEstado(hObj.estado_nuevo),
             horas_sumadas: Number(hObj.horas_sumadas ?? 0),
             comentario: String(hObj.comentario ?? ""),
           };
@@ -358,7 +364,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   }
 
   if (cambios.length === 0) {
-    return Response.json({ data: formatIncidencia(incidencia) }, { status: 200 });
+    return Response.json({ data: await formatIncidencia(incidencia) }, { status: 200 });
   }
 
   const updateOperation: Record<string, unknown> = {};

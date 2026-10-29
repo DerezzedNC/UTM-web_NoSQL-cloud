@@ -80,6 +80,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
             return;
           }
         }
+        if (res.status === 401) {
+          window.localStorage.removeItem(SESSION_KEY);
+          if (isMounted) {
+            setSession(null);
+            setHydrated(true);
+          }
+          return;
+        }
       } catch {
         // Fallback local ante fallos transitorios de red
       }
@@ -119,7 +127,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       router.replace("/login");
       return;
     }
-    if (pathname === "/portal" || !canAccess(session.role, pathname)) {
+    if (pathname !== "/portal" && !canAccess(session.role, pathname)) {
       router.replace("/portal");
     }
   }, [hydrated, pathname, router, session]);
