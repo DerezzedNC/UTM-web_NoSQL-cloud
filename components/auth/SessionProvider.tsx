@@ -3,9 +3,12 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import type { FrontendRole } from "@/lib/rbac";
+import type { RolReportante } from "@/lib/incidencias/types";
 
 type Session = {
+  id_usuario: string;
   role: FrontendRole;
+  rol_institucional: RolReportante;
   name: string;
   department: string;
   email: string;
@@ -21,11 +24,41 @@ type SessionContextValue = {
 
 const SESSION_KEY = "utm-desk-session";
 const roleProfiles: Record<FrontendRole, Omit<Session, "role">> = {
-  admin: { name: "Ing. Carlos Méndez", department: "Administración de Infraestructura", email: "admin@utm.edu.mx" },
-  directiva: { name: "Dra. Beatriz Arizmendi", department: "Dirección General de Tecnología", email: "directiva@utm.edu.mx" },
-  coordinador: { name: "Lic. Mariana Valenzuela", department: "Coordinación de Operaciones", email: "coordinador@utm.edu.mx" },
-  tecnico: { name: "Ing. Carlos Morales", department: "Infraestructura y TI", email: "tecnico@utm.edu.mx" },
-  reportante: { name: "Carlos Méndez", department: "Docencia · Campus Central", email: "reportante@utm.edu.mx" },
+  admin: {
+    id_usuario: "u-admin-mendez",
+    rol_institucional: "Administrativo",
+    name: "Ing. Carlos Méndez",
+    department: "Administración de Infraestructura",
+    email: "admin@utm.edu.mx",
+  },
+  directiva: {
+    id_usuario: "u-directiva-arizmendi",
+    rol_institucional: "Administrativo",
+    name: "Dra. Beatriz Arizmendi",
+    department: "Dirección General de Tecnología",
+    email: "directiva@utm.edu.mx",
+  },
+  coordinador: {
+    id_usuario: "u-coord-valenzuela",
+    rol_institucional: "Administrativo",
+    name: "Lic. Mariana Valenzuela",
+    department: "Coordinación de Operaciones",
+    email: "coordinador@utm.edu.mx",
+  },
+  tecnico: {
+    id_usuario: "u-tec-morales",
+    rol_institucional: "Administrativo",
+    name: "Ing. Carlos Morales",
+    department: "Infraestructura y TI",
+    email: "tecnico@utm.edu.mx",
+  },
+  reportante: {
+    id_usuario: "u-carlos-mendez",
+    rol_institucional: "Docente",
+    name: "Carlos Méndez",
+    department: "Docencia · Campus Central",
+    email: "reportante@utm.edu.mx",
+  },
 };
 const DEMO_PASSWORD = "utm-demo";
 
@@ -53,7 +86,19 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       const stored = window.localStorage.getItem(SESSION_KEY);
       if (stored) {
         try {
-          setSession(JSON.parse(stored) as Session);
+          const parsed = JSON.parse(stored) as Partial<Session> & { role?: FrontendRole };
+          if (parsed.role && roleProfiles[parsed.role]) {
+            const normalized: Session = {
+              role: parsed.role,
+              ...roleProfiles[parsed.role],
+              ...parsed,
+              id_usuario: parsed.id_usuario ?? roleProfiles[parsed.role].id_usuario,
+              rol_institucional: parsed.rol_institucional ?? roleProfiles[parsed.role].rol_institucional,
+            };
+            setSession(normalized);
+          } else {
+            window.localStorage.removeItem(SESSION_KEY);
+          }
         } catch {
           window.localStorage.removeItem(SESSION_KEY);
         }

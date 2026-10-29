@@ -1,19 +1,21 @@
-import type { IncidenciaCampusPayload } from "./schema";
+import type { RegistroIncidenciaPayload } from "./registro-schema";
 import type { BorradorIncidencia } from "./types";
 
 export function armarPayload(
   borrador: BorradorIncidencia,
-): IncidenciaCampusPayload | null {
-  if (!borrador.prioridad || !borrador.categoria) {
+): RegistroIncidenciaPayload | null {
+  if (!borrador.categoria) {
     return null;
   }
 
   const base = {
     titulo: borrador.titulo,
     descripcion: borrador.descripcion,
-    prioridad: borrador.prioridad,
+    prioridad: borrador.prioridad || ("media" as const),
+    tags: [] as string[],
     ubicacion: borrador.ubicacion,
     reportante: borrador.reportante,
+    evidencias: borrador.evidencias,
   };
 
   if (borrador.categoria === "computo_redes") {

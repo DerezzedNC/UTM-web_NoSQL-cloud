@@ -31,6 +31,7 @@ function writeDemoIncidencias(incidencias: IncidenciaDetalle[]) {
 }
 
 export function createDemoIncidencia(payload: RegistroIncidenciaPayload) {
+  const now = new Date().toISOString();
   const folio = `INC-${new Date().getFullYear()}-${String(nextNumber++).padStart(4, "0")}`;
   const detalle = payload.categoria === "computo_redes"
     ? {
@@ -47,11 +48,17 @@ export function createDemoIncidencia(payload: RegistroIncidenciaPayload) {
     descripcion: payload.descripcion,
     prioridad: payload.prioridad,
     estado: "abierta",
-    fecha_creacion: new Date().toISOString(),
+    fecha_creacion: now,
     categoria: payload.categoria,
     tags: payload.tags,
     horas_invertidas: 0,
-    evidencias_adjuntas: [],
+    evidencias_adjuntas: (payload.evidencias ?? []).map((item) => ({
+      nombre_archivo: item.nombre_archivo,
+      tipo_mime: item.tipo_mime,
+      peso_kb: item.peso_kb,
+      url_storage: `incidencias/${folio}/${item.nombre_archivo}`,
+      fecha_carga: now,
+    })),
     ubicacion: payload.ubicacion,
     reportante: {
       id_usuario: payload.reportante.id_usuario,
@@ -61,7 +68,7 @@ export function createDemoIncidencia(payload: RegistroIncidenciaPayload) {
     },
     detalle_especifico: detalle,
     historial_seguimiento: [{
-      fecha: new Date().toISOString(),
+      fecha: now,
       autor: payload.reportante.nombre,
       estado_nuevo: "abierta",
       horas_sumadas: 0,

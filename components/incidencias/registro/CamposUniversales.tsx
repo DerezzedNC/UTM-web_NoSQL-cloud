@@ -1,10 +1,5 @@
 import { Field, inputClass } from "@/components/ui/Field";
-import { PRIORIDAD_META } from "@/lib/incidencias/constants";
-import {
-  PRIORIDADES,
-  type BorradorIncidencia,
-  type Prioridad,
-} from "@/lib/incidencias/types";
+import type { BorradorIncidencia } from "@/lib/incidencias/types";
 
 type CamposUniversalesProps = {
   value: BorradorIncidencia;
@@ -55,37 +50,6 @@ export function CamposUniversales({
           className={`${inputClass(Boolean(errors.descripcion))} min-h-28 resize-y`}
         />
       </Field>
-
-      <fieldset>
-        <legend className="mb-2 text-sm font-medium text-slate-800">
-          Prioridad
-        </legend>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {PRIORIDADES.map((prioridad) => (
-            <label
-              key={prioridad}
-              data-selected={value.prioridad === prioridad}
-              className={`cursor-pointer rounded-xl border px-3 py-3 text-center text-sm font-semibold ring-2 ring-transparent transition ${PRIORIDAD_META[prioridad].clase}`}
-            >
-              <input
-                type="radio"
-                name="prioridad"
-                value={prioridad}
-                checked={value.prioridad === prioridad}
-                onChange={() => onChange("prioridad", prioridad as Prioridad)}
-                className="sr-only"
-              />
-              {PRIORIDAD_META[prioridad].etiqueta}
-            </label>
-          ))}
-        </div>
-        {errors.prioridad ? (
-          <p className="mt-2 text-sm text-rose-700" role="alert">
-            {errors.prioridad}
-          </p>
-        ) : null}
-      </fieldset>
-
     </div>
   );
 }
