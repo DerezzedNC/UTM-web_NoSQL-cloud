@@ -38,6 +38,10 @@ export function sanitizeRedisError(errorText: string): string {
  * Valida que existan UPSTASH_REDIS_REST_URL y UPSTASH_REDIS_REST_TOKEN.
  */
 export function getRedisClient(): Redis {
+  if (global._redisClientInstance) {
+    return global._redisClientInstance;
+  }
+
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
 
@@ -47,10 +51,8 @@ export function getRedisClient(): Redis {
     );
   }
 
-  if (process.env.NODE_ENV === "development") {
-    if (!global._redisClientInstance) {
-      global._redisClientInstance = new Redis({ url, token });
-    }
+  if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test") {
+    global._redisClientInstance = new Redis({ url, token });
     return global._redisClientInstance;
   }
 

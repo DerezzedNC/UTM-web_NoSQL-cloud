@@ -57,6 +57,7 @@ export const BORRADOR_INICIAL = {
   reportante: {
     id_usuario: "",
     nombre: "",
+    rol_institucional: "Docente" as const,
     rol: "Docente" as const,
     correo: "",
   },

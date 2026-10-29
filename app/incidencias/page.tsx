@@ -11,7 +11,15 @@ const estados: { value: "" | EstadoIncidencia; label: string }[] = [
   { value: "", label: "Todos" }, { value: "abierta", label: "abierta" }, { value: "en proceso", label: "en proceso" },
   { value: "en espera", label: "en espera" }, { value: "resuelta", label: "resuelta" }, { value: "cerrada", label: "cerrada" },
 ];
-const stateStyle: Record<EstadoIncidencia, string> = { abierta: "bg-teal-50 text-teal-700", "en proceso": "bg-emerald-50 text-emerald-700", "en espera": "bg-slate-100 text-slate-600", resuelta: "bg-emerald-50 text-emerald-700", cerrada: "bg-slate-100 text-slate-500" };
+const stateStyle: Record<EstadoIncidencia, string> = {
+  abierta: "bg-teal-50 text-teal-700",
+  "en proceso": "bg-emerald-50 text-emerald-700",
+  en_proceso: "bg-emerald-50 text-emerald-700",
+  "en espera": "bg-slate-100 text-slate-600",
+  en_espera: "bg-slate-100 text-slate-600",
+  resuelta: "bg-emerald-50 text-emerald-700",
+  cerrada: "bg-slate-100 text-slate-500",
+};
 const priorityBorder: Record<Prioridad, string> = { critica: "border-l-red-600", alta: "border-l-orange-500", media: "border-l-yellow-400", baja: "border-l-emerald-500" };
 const stateSelectClass = "rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition-all duration-200 focus:border-teal-600 focus:ring-2 focus:ring-teal-100";
 

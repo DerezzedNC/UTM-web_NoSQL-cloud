@@ -9,7 +9,15 @@ import { canCloseTicket, hasPermission } from "@/lib/rbac";
 import type { EstadoIncidencia, IncidenciaCampus } from "@/lib/incidencias/types";
 
 const estados: EstadoIncidencia[] = ["abierta", "en proceso", "en espera", "resuelta", "cerrada"];
-const stateStyle: Record<EstadoIncidencia, string> = { abierta: "bg-teal-50 text-teal-700", "en proceso": "bg-emerald-50 text-emerald-700", "en espera": "bg-amber-50 text-amber-700", resuelta: "bg-emerald-50 text-emerald-700", cerrada: "bg-slate-100 text-slate-600" };
+const stateStyle: Record<EstadoIncidencia, string> = {
+  abierta: "bg-teal-50 text-teal-700",
+  "en proceso": "bg-emerald-50 text-emerald-700",
+  en_proceso: "bg-emerald-50 text-emerald-700",
+  "en espera": "bg-amber-50 text-amber-700",
+  en_espera: "bg-amber-50 text-amber-700",
+  resuelta: "bg-emerald-50 text-emerald-700",
+  cerrada: "bg-slate-100 text-slate-600",
+};
 const stateSelectClass = "w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 outline-none transition-all duration-200 focus:border-teal-600 focus:ring-2 focus:ring-teal-100";
 
 export default function IncidenciaDetallePage({ params }: { params: Promise<{ id: string }> }) {
