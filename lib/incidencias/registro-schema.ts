@@ -7,6 +7,7 @@ import {
   ubicacionSchema,
   reportanteSchema,
   camposUniversalesSchema,
+  evidenciaBorradorSchema,
 } from "./schema";
 
 export const registroIncidenciaSchema = incidenciaCampusSchema;
@@ -19,4 +20,5 @@ export {
   ubicacionSchema,
   reportanteSchema,
   camposUniversalesSchema,
+  evidenciaBorradorSchema,
 };

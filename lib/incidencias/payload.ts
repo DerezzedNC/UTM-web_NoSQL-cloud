@@ -1,17 +1,18 @@
-import type { IncidenciaCampusPayload } from "./schema";
+import type { RegistroIncidenciaPayload } from "./registro-schema";
 import type { BorradorIncidencia } from "./types";
 
 export function armarPayload(
   borrador: BorradorIncidencia,
-): IncidenciaCampusPayload | null {
-  if (!borrador.prioridad || !borrador.categoria) {
+): RegistroIncidenciaPayload | null {
+  if (!borrador.categoria) {
     return null;
   }
 
   const base = {
     titulo: borrador.titulo,
     descripcion: borrador.descripcion,
-    prioridad: borrador.prioridad,
+    prioridad: borrador.prioridad || ("media" as const),
+    tags: [] as string[],
     ubicacion: borrador.ubicacion,
     reportante: {
       id_usuario: borrador.reportante.id_usuario,
@@ -20,7 +21,7 @@ export function armarPayload(
       rol: (borrador.reportante.rol ?? borrador.reportante.rol_institucional) as "Docente" | "Estudiante" | "Administrativo",
       correo: borrador.reportante.correo,
     },
-    tags: [] as string[],
+    evidencias: borrador.evidencias,
   };
 
   if (borrador.categoria === "computo_redes") {

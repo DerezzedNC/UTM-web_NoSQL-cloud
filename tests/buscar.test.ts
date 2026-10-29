@@ -28,6 +28,22 @@ describe("GET /api/incidencias/buscar - Migración y Persistencia en MongoDB Atl
     departamento: "Soporte Técnico",
   };
 
+  const coordinadorUser: AuthUser = {
+    id_usuario: "usr_coord_01",
+    nombre: "Ing. Beatriz Paredes",
+    correo: "coordinacion@utm.edu.mx",
+    rol: "coordinador",
+    departamento: "Coordinación de Tecnologías",
+  };
+
+  const adminUser: AuthUser = {
+    id_usuario: "usr_adm_01",
+    nombre: "Administrador General",
+    correo: "admin@utm.edu.mx",
+    rol: "admin",
+    departamento: "Dirección de TI",
+  };
+
   const directivaUser: AuthUser = {
     id_usuario: "usr_dir_01",
     nombre: "Dra. Arizmendi",
@@ -102,50 +118,88 @@ describe("GET /api/incidencias/buscar - Migración y Persistencia en MongoDB Atl
     simulateNetworkErrorDuringText = false;
     fallbackOrQueryExecuted = false;
 
-    const filterCollection = (filter: Record<string, unknown>) => {
-      return mockDocs.filter((doc) => {
-        if (filter.categoria && doc.categoria !== filter.categoria) {
-          return false;
-        }
-        if (filter.estado && doc.estado !== filter.estado) {
-          return false;
-        }
-        if (filter["ubicacion.edificio"]) {
-          const regexObj = filter["ubicacion.edificio"] as { $regex?: string; $options?: string };
-          const u = (doc.ubicacion ?? {}) as Record<string, string>;
-          const edif = u.edificio ?? "";
-          if (regexObj.$regex) {
-            const re = new RegExp(regexObj.$regex, regexObj.$options ?? "");
-            if (!re.test(edif)) return false;
-          }
-        }
-        if (filter.$text) {
-          const search = String((filter.$text as { $search: string }).$search).toLowerCase();
-          const titulo = String(doc.titulo ?? "").toLowerCase();
-          const desc = String(doc.descripcion ?? "").toLowerCase();
-          if (!titulo.includes(search) && !desc.includes(search)) {
-            return false;
-          }
-        }
-        if (filter.$or && Array.isArray(filter.$or)) {
+    const hasTextQuery = (filter: Record<string, unknown>): boolean => {
+      if (!filter || typeof filter !== "object") return false;
+      if (filter.$text) return true;
+      if (Array.isArray(filter.$and)) {
+        return filter.$and.some((c) => Boolean(c && typeof c === "object" && hasTextQuery(c as Record<string, unknown>)));
+      }
+      return false;
+    };
+
+    const matchSingleCondition = (doc: Record<string, unknown>, cond: Record<string, unknown>): boolean => {
+      if (cond.$and && Array.isArray(cond.$and)) {
+        return cond.$and.every((sub) => matchSingleCondition(doc, sub as Record<string, unknown>));
+      }
+      if (cond.$or && Array.isArray(cond.$or)) {
+        const isTextFallback = cond.$or.some((c: Record<string, unknown>) => c.titulo || c.descripcion);
+        if (isTextFallback) {
           fallbackOrQueryExecuted = true;
-          const matchesAny = filter.$or.some((condition: Record<string, unknown>) => {
-            if (condition.titulo) {
-              const regexObj = condition.titulo as { $regex?: string; $options?: string };
-              const re = new RegExp(regexObj.$regex ?? "", regexObj.$options ?? "");
-              return re.test(String(doc.titulo ?? ""));
-            }
-            if (condition.descripcion) {
-              const regexObj = condition.descripcion as { $regex?: string; $options?: string };
-              const re = new RegExp(regexObj.$regex ?? "", regexObj.$options ?? "");
-              return re.test(String(doc.descripcion ?? ""));
-            }
-            return false;
-          });
-          if (!matchesAny) return false;
         }
-        return true;
-      });
+        return cond.$or.some((sub) => matchSingleCondition(doc, sub as Record<string, unknown>));
+      }
+      if (cond.categoria && doc.categoria !== cond.categoria) {
+        return false;
+      }
+      if (cond.estado && doc.estado !== cond.estado) {
+        return false;
+      }
+      if (cond["ubicacion.edificio"]) {
+        const regexObj = cond["ubicacion.edificio"] as { $regex?: string; $options?: string };
+        const u = (doc.ubicacion ?? {}) as Record<string, string>;
+        const edif = u.edificio ?? "";
+        if (regexObj.$regex) {
+          const re = new RegExp(regexObj.$regex, regexObj.$options ?? "");
+          if (!re.test(edif)) return false;
+        }
+      }
+      if (cond["reportante.id_usuario"]) {
+        const rep = (doc.reportante ?? {}) as Record<string, string>;
+        if (rep.id_usuario !== cond["reportante.id_usuario"]) return false;
+      }
+      if (cond["reportante.correo"]) {
+        const rep = (doc.reportante ?? {}) as Record<string, string>;
+        if (String(rep.correo ?? "").toLowerCase() !== String(cond["reportante.correo"]).toLowerCase()) return false;
+      }
+      if (cond["tecnico_asignado.id_usuario"]) {
+        const tec = (doc.tecnico_asignado ?? {}) as Record<string, string>;
+        if (tec.id_usuario !== cond["tecnico_asignado.id_usuario"]) return false;
+      }
+      if (cond["tecnico_asignado.correo"]) {
+        const tec = (doc.tecnico_asignado ?? {}) as Record<string, string>;
+        if (String(tec.correo ?? "").toLowerCase() !== String(cond["tecnico_asignado.correo"]).toLowerCase()) return false;
+      }
+      if (cond.titulo) {
+        if (typeof cond.titulo === "object" && cond.titulo !== null && "$regex" in cond.titulo) {
+          const regexObj = cond.titulo as { $regex?: string; $options?: string };
+          const re = new RegExp(regexObj.$regex ?? "", regexObj.$options ?? "");
+          if (!re.test(String(doc.titulo ?? ""))) return false;
+        } else if (doc.titulo !== cond.titulo) {
+          return false;
+        }
+      }
+      if (cond.descripcion) {
+        if (typeof cond.descripcion === "object" && cond.descripcion !== null && "$regex" in cond.descripcion) {
+          const regexObj = cond.descripcion as { $regex?: string; $options?: string };
+          const re = new RegExp(regexObj.$regex ?? "", regexObj.$options ?? "");
+          if (!re.test(String(doc.descripcion ?? ""))) return false;
+        } else if (doc.descripcion !== cond.descripcion) {
+          return false;
+        }
+      }
+      if (cond.$text) {
+        const search = String((cond.$text as { $search: string }).$search).toLowerCase();
+        const titulo = String(doc.titulo ?? "").toLowerCase();
+        const desc = String(doc.descripcion ?? "").toLowerCase();
+        if (!titulo.includes(search) && !desc.includes(search)) {
+          return false;
+        }
+      }
+      return true;
+    };
+
+    const filterCollection = (filter: Record<string, unknown>) => {
+      return mockDocs.filter((doc) => matchSingleCondition(doc, filter));
     };
 
     const mockDb = {
@@ -160,12 +214,12 @@ describe("GET /api/incidencias/buscar - Migración y Persistencia en MongoDB Atl
             if (shouldFailMongo) {
               throw new Error(mongoFailMessage || "Error simulado en countDocuments");
             }
-            if (filter.$text && simulateMissingTextIndex) {
+            if (hasTextQuery(filter) && simulateMissingTextIndex) {
               const err = new Error("text index required for $text query");
               Object.assign(err, { code: 27, codeName: "IndexNotFound" });
               throw err;
             }
-            if (filter.$text && simulateNetworkErrorDuringText) {
+            if (hasTextQuery(filter) && simulateNetworkErrorDuringText) {
               throw new Error(
                 "MongoNetworkError: failed to connect to mongodb+srv://admin_usr:SecretPass123@cluster0.utm.mongodb.net/utm_desk_db"
               );
@@ -173,12 +227,12 @@ describe("GET /api/incidencias/buscar - Migración y Persistencia en MongoDB Atl
             return filterCollection(filter).length;
           },
           find: (filter: Record<string, unknown> = {}) => {
-            if (filter.$text && simulateMissingTextIndex) {
+            if (hasTextQuery(filter) && simulateMissingTextIndex) {
               const err = new Error("text index required for $text query");
               Object.assign(err, { code: 27, codeName: "IndexNotFound" });
               throw err;
             }
-            if (filter.$text && simulateNetworkErrorDuringText) {
+            if (hasTextQuery(filter) && simulateNetworkErrorDuringText) {
               throw new Error(
                 "MongoNetworkError: failed to connect to mongodb+srv://admin_usr:SecretPass123@cluster0.utm.mongodb.net/utm_desk_db"
               );
@@ -352,7 +406,7 @@ describe("GET /api/incidencias/buscar - Migración y Persistencia en MongoDB Atl
       }),
     ];
 
-    const token = await createSessionToken(tecnicoUser);
+    const token = await createSessionToken(directivaUser);
 
     // Filtro categoria
     {
@@ -593,7 +647,7 @@ describe("GET /api/incidencias/buscar - Migración y Persistencia en MongoDB Atl
       }),
     ];
 
-    const token = await createSessionToken(tecnicoUser);
+    const token = await createSessionToken(directivaUser);
     const req = new Request("http://localhost:3000/api/incidencias/buscar", {
       headers: { authorization: `Bearer ${token}` },
     });
@@ -638,7 +692,7 @@ describe("GET /api/incidencias/buscar - Migración y Persistencia en MongoDB Atl
       }),
     ];
 
-    const token = await createSessionToken(reportanteUser);
+    const token = await createSessionToken(directivaUser);
     const req = new Request("http://localhost:3000/api/incidencias/buscar?q=switch", {
       headers: { authorization: `Bearer ${token}` },
     });
@@ -664,7 +718,7 @@ describe("GET /api/incidencias/buscar - Migración y Persistencia en MongoDB Atl
       }),
     ];
 
-    const token = await createSessionToken(tecnicoUser);
+    const token = await createSessionToken(directivaUser);
     const req = new Request("http://localhost:3000/api/incidencias/buscar?q=switch", {
       headers: { authorization: `Bearer ${token}` },
     });
@@ -722,5 +776,137 @@ describe("GET /api/incidencias/buscar - Migración y Persistencia en MongoDB Atl
       // Ningún documento tiene literalmente ".*" en título o descripción
       assert.equal(body.data.length, 0);
     }
+  });
+
+  // ==========================================================================
+  // 10. SCOPING POR ROL EN SERVIDOR Y MITIGACIÓN DE BYPASS POR QUERY STRINGS
+  // ==========================================================================
+  test("10. Reportante solo puede consultar incidencias reportadas por él mismo", async () => {
+    mockDocs = [
+      sampleIncidencia({
+        _id: "doc_propio",
+        folio: "INC-2026-OWN",
+        reportante: {
+          id_usuario: "usr_rep_10",
+          nombre: "Ing. Roberto Salgado",
+          correo: "rsalgado@utm.edu.mx",
+        },
+      }),
+      sampleIncidencia({
+        _id: "doc_ajeno",
+        folio: "INC-2026-OTHER",
+        reportante: {
+          id_usuario: "usr_rep_99",
+          nombre: "Otro Reportante",
+          correo: "otro@utm.edu.mx",
+        },
+      }),
+    ];
+
+    const token = await createSessionToken(reportanteUser);
+    const req = new Request("http://localhost:3000/api/incidencias/buscar", {
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    const res = await GET(req);
+    assert.equal(res.status, 200);
+    const body = (await res.json()) as { data: Array<{ folio: string }> };
+    assert.equal(body.data.length, 1);
+    assert.equal(body.data[0].folio, "INC-2026-OWN");
+  });
+
+  test("10. Técnico solo puede consultar incidencias asignadas a él", async () => {
+    mockDocs = [
+      sampleIncidencia({
+        _id: "doc_asignado",
+        folio: "INC-2026-ASG",
+        tecnico_asignado: {
+          id_usuario: "usr_tec_01",
+          nombre: "Carlos Mendoza",
+          correo: "cmendoza@utm.edu.mx",
+        },
+      }),
+      sampleIncidencia({
+        _id: "doc_otro_tecnico",
+        folio: "INC-2026-OTHER-TEC",
+        tecnico_asignado: {
+          id_usuario: "usr_tec_99",
+          nombre: "Otro Técnico",
+          correo: "otro_tec@utm.edu.mx",
+        },
+      }),
+      sampleIncidencia({
+        _id: "doc_sin_asignar",
+        folio: "INC-2026-UNASG",
+      }),
+    ];
+
+    const token = await createSessionToken(tecnicoUser);
+    const req = new Request("http://localhost:3000/api/incidencias/buscar", {
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    const res = await GET(req);
+    assert.equal(res.status, 200);
+    const body = (await res.json()) as { data: Array<{ folio: string }> };
+    assert.equal(body.data.length, 1);
+    assert.equal(body.data[0].folio, "INC-2026-ASG");
+  });
+
+  test("10. Coordinador, administrador y directiva pueden consultar todo el conjunto autorizado", async () => {
+    mockDocs = [
+      sampleIncidencia({ _id: "doc_1", folio: "INC-2026-0001" }),
+      sampleIncidencia({ _id: "doc_2", folio: "INC-2026-0002" }),
+    ];
+
+    for (const user of [coordinadorUser, adminUser, directivaUser]) {
+      const token = await createSessionToken(user);
+      const req = new Request("http://localhost:3000/api/incidencias/buscar", {
+        headers: { authorization: `Bearer ${token}` },
+      });
+      const res = await GET(req);
+      assert.equal(res.status, 200);
+      const body = (await res.json()) as { data: Array<{ folio: string }> };
+      assert.equal(body.data.length, 2);
+    }
+  });
+
+  test("10. Parámetros rol, id_usuario y correo en query string son ignorados y no omiten restricción de propiedad", async () => {
+    mockDocs = [
+      sampleIncidencia({
+        _id: "doc_propio",
+        folio: "INC-2026-OWN",
+        reportante: {
+          id_usuario: "usr_rep_10",
+          nombre: "Ing. Roberto Salgado",
+          correo: "rsalgado@utm.edu.mx",
+        },
+      }),
+      sampleIncidencia({
+        _id: "doc_ajeno",
+        folio: "INC-2026-OTHER",
+        reportante: {
+          id_usuario: "usr_rep_99",
+          nombre: "Otro Reportante",
+          correo: "otro@utm.edu.mx",
+        },
+      }),
+    ];
+
+    const token = await createSessionToken(reportanteUser);
+    // Intento de manipulación de query params para elevarse a admin y ver todo o suplantar id_usuario
+    const req = new Request(
+      "http://localhost:3000/api/incidencias/buscar?rol=admin&id_usuario=usr_rep_99&correo=otro@utm.edu.mx",
+      {
+        headers: { authorization: `Bearer ${token}` },
+      }
+    );
+
+    const res = await GET(req);
+    assert.equal(res.status, 200);
+    const body = (await res.json()) as { data: Array<{ folio: string }> };
+    // A pesar de ?rol=admin, el servidor aplica el rol real de la sesión (reportante) y solo devuelve la suya
+    assert.equal(body.data.length, 1);
+    assert.equal(body.data[0].folio, "INC-2026-OWN");
   });
 });

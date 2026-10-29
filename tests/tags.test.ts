@@ -158,14 +158,14 @@ describe("PATCH /api/incidencias/[id]/tags - Migración segura a MongoDB Atlas",
       },
       usr_deactivated: {
         id_usuario: "usr_deactivated",
-        nombre: "Técnico Desactivado",
+        nombre: "Coordinador Desactivado",
         correo: "desactivado@utm.edu.mx",
-        rol: "tecnico",
+        rol: "coordinador",
         activo: false,
       },
       usr_demoted_to_rep: {
         id_usuario: "usr_demoted_to_rep",
-        nombre: "Técnico Degradado",
+        nombre: "Coordinador Degradado",
         correo: "degradado@utm.edu.mx",
         rol: "reportante",
         activo: true,
@@ -333,6 +333,25 @@ describe("PATCH /api/incidencias/[id]/tags - Migración segura a MongoDB Atlas",
     assert.match(body.error, /permisos suficientes/i);
   });
 
+  test("2. Rechaza con HTTP 403 a usuarios con rol 'tecnico' (solo coordinador y admin gestionan etiquetas)", async () => {
+    const token = await createSessionToken(tecnicoUser);
+    const req = new Request("http://localhost:3000/api/incidencias/65fabc1234567890abcdef01/tags", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ action: "add", tag: "urgente" }),
+    });
+
+    const res = await PATCH(req, {
+      params: Promise.resolve({ id: "65fabc1234567890abcdef01" }),
+    });
+    assert.equal(res.status, 403);
+    const body = await res.json();
+    assert.match(body.error, /permisos suficientes/i);
+  });
+
   test("2. Rechaza con HTTP 403 a usuarios con rol 'directiva'", async () => {
     const token = await createSessionToken(directivaUser);
     const req = new Request("http://localhost:3000/api/incidencias/65fabc1234567890abcdef01/tags", {
@@ -374,10 +393,10 @@ describe("PATCH /api/incidencias/[id]/tags - Migración segura a MongoDB Atlas",
   test("3. Rechaza con HTTP 403 a usuarios desactivados en MongoDB", async () => {
     const deactivatedUser: AuthUser = {
       id_usuario: "usr_deactivated",
-      nombre: "Técnico Desactivado",
+      nombre: "Coordinador Desactivado",
       correo: "desactivado@utm.edu.mx",
-      rol: "tecnico",
-      departamento: "Soporte Técnico",
+      rol: "coordinador",
+      departamento: "Coordinación",
     };
     const token = await createSessionToken(deactivatedUser);
 
@@ -424,13 +443,13 @@ describe("PATCH /api/incidencias/[id]/tags - Migración segura a MongoDB Atlas",
   });
 
   test("3. Rechaza con HTTP 403 a usuarios degradados de rol en MongoDB", async () => {
-    // JWT afirma ser 'tecnico', pero en BD está registrado como 'reportante'
+    // JWT afirma ser 'coordinador', pero en BD está registrado como 'reportante'
     const demotedUser: AuthUser = {
       id_usuario: "usr_demoted_to_rep",
-      nombre: "Técnico Degradado",
+      nombre: "Coordinador Degradado",
       correo: "degradado@utm.edu.mx",
-      rol: "tecnico",
-      departamento: "Soporte Técnico",
+      rol: "coordinador",
+      departamento: "Coordinación",
     };
     const token = await createSessionToken(demotedUser);
 
@@ -480,8 +499,8 @@ describe("PATCH /api/incidencias/[id]/tags - Migración segura a MongoDB Atlas",
   // ==========================================================================
   // 5. AGREGAR UNA ETIQUETA CORRECTAMENTE
   // ==========================================================================
-  test("5. Técnico agrega una etiqueta correctamente por ObjectId", async () => {
-    const token = await createSessionToken(tecnicoUser);
+  test("5. Coordinador agrega una etiqueta correctamente por ObjectId", async () => {
+    const token = await createSessionToken(coordinadorUser);
     const req = new Request("http://localhost:3000/api/incidencias/65fabc1234567890abcdef01/tags", {
       method: "PATCH",
       headers: {
@@ -547,7 +566,7 @@ describe("PATCH /api/incidencias/[id]/tags - Migración segura a MongoDB Atlas",
   // 6. AGREGAR UNA ETIQUETA QUE YA EXISTE SIN DUPLICARLA ($addToSet)
   // ==========================================================================
   test("6. Agregar una etiqueta existente no genera duplicados ($addToSet)", async () => {
-    const token = await createSessionToken(tecnicoUser);
+    const token = await createSessionToken(coordinadorUser);
     const req = new Request("http://localhost:3000/api/incidencias/65fabc1234567890abcdef01/tags", {
       method: "PATCH",
       headers: {
@@ -572,7 +591,7 @@ describe("PATCH /api/incidencias/[id]/tags - Migración segura a MongoDB Atlas",
   // 7. ELIMINAR UNA ETIQUETA EXISTENTE Y MANEJAR ETIQUETA INEXISTENTE ($pull)
   // ==========================================================================
   test("7. Eliminar una etiqueta existente la remueve del documento ($pull)", async () => {
-    const token = await createSessionToken(tecnicoUser);
+    const token = await createSessionToken(coordinadorUser);
     const req = new Request("http://localhost:3000/api/incidencias/65fabc1234567890abcdef01/tags", {
       method: "PATCH",
       headers: {
@@ -594,7 +613,7 @@ describe("PATCH /api/incidencias/[id]/tags - Migración segura a MongoDB Atlas",
   });
 
   test("7. Eliminar una etiqueta no existente no altera la lista de etiquetas", async () => {
-    const token = await createSessionToken(tecnicoUser);
+    const token = await createSessionToken(coordinadorUser);
     const req = new Request("http://localhost:3000/api/incidencias/65fabc1234567890abcdef01/tags", {
       method: "PATCH",
       headers: {
@@ -616,7 +635,7 @@ describe("PATCH /api/incidencias/[id]/tags - Migración segura a MongoDB Atlas",
   // 8. RECHAZO DE ACCIONES, FORMATOS Y VALORES INVÁLIDOS
   // ==========================================================================
   test("8. Rechaza acción no soportada con HTTP 400", async () => {
-    const token = await createSessionToken(tecnicoUser);
+    const token = await createSessionToken(coordinadorUser);
     const req = new Request("http://localhost:3000/api/incidencias/65fabc1234567890abcdef01/tags", {
       method: "PATCH",
       headers: {
@@ -635,7 +654,7 @@ describe("PATCH /api/incidencias/[id]/tags - Migración segura a MongoDB Atlas",
   });
 
   test("8. Rechaza etiqueta vacía o con solo espacios con HTTP 400", async () => {
-    const token = await createSessionToken(tecnicoUser);
+    const token = await createSessionToken(coordinadorUser);
     const req = new Request("http://localhost:3000/api/incidencias/65fabc1234567890abcdef01/tags", {
       method: "PATCH",
       headers: {
@@ -652,7 +671,7 @@ describe("PATCH /api/incidencias/[id]/tags - Migración segura a MongoDB Atlas",
   });
 
   test("8. Rechaza etiqueta que supera 50 caracteres con HTTP 400", async () => {
-    const token = await createSessionToken(tecnicoUser);
+    const token = await createSessionToken(coordinadorUser);
     const req = new Request("http://localhost:3000/api/incidencias/65fabc1234567890abcdef01/tags", {
       method: "PATCH",
       headers: {
@@ -669,7 +688,7 @@ describe("PATCH /api/incidencias/[id]/tags - Migración segura a MongoDB Atlas",
   });
 
   test("8. Rechaza cuerpo que no es un JSON válido con HTTP 400", async () => {
-    const token = await createSessionToken(tecnicoUser);
+    const token = await createSessionToken(coordinadorUser);
     const req = new Request("http://localhost:3000/api/incidencias/65fabc1234567890abcdef01/tags", {
       method: "PATCH",
       headers: {
@@ -688,7 +707,7 @@ describe("PATCH /api/incidencias/[id]/tags - Migración segura a MongoDB Atlas",
   });
 
   test("8. Rechaza identificador de incidencia vacío con HTTP 400", async () => {
-    const token = await createSessionToken(tecnicoUser);
+    const token = await createSessionToken(coordinadorUser);
     const req = new Request("http://localhost:3000/api/incidencias/ /tags", {
       method: "PATCH",
       headers: {
@@ -708,7 +727,7 @@ describe("PATCH /api/incidencias/[id]/tags - Migración segura a MongoDB Atlas",
   // 9. INCIDENCIA INEXISTENTE
   // ==========================================================================
   test("9. Retorna HTTP 404 si la incidencia no existe en MongoDB Atlas", async () => {
-    const token = await createSessionToken(tecnicoUser);
+    const token = await createSessionToken(coordinadorUser);
     const req = new Request("http://localhost:3000/api/incidencias/65fabc999999999999999999/tags", {
       method: "PATCH",
       headers: {
@@ -733,7 +752,7 @@ describe("PATCH /api/incidencias/[id]/tags - Migración segura a MongoDB Atlas",
     shouldFailMongo = true;
     mongoFailMessage = "MongoNetworkTimeoutError: connection to mongodb://admin:SuperSecretPassword123@cluster0.abcde.mongodb.net:27017 failed";
 
-    const token = await createSessionToken(tecnicoUser);
+    const token = await createSessionToken(coordinadorUser);
     const req = new Request("http://localhost:3000/api/incidencias/65fabc1234567890abcdef01/tags", {
       method: "PATCH",
       headers: {
@@ -759,7 +778,7 @@ describe("PATCH /api/incidencias/[id]/tags - Migración segura a MongoDB Atlas",
   test("11. Confirma que las modificaciones impactan MongoDB y no alteran INCIDENCIAS_INICIALES", async () => {
     const initialMockSnapshot = JSON.stringify(INCIDENCIAS_INICIALES);
 
-    const token = await createSessionToken(tecnicoUser);
+    const token = await createSessionToken(coordinadorUser);
     const req = new Request("http://localhost:3000/api/incidencias/65fabc1234567890abcdef01/tags", {
       method: "PATCH",
       headers: {

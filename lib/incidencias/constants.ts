@@ -1,4 +1,4 @@
-import type { CategoriaIncidencia, Prioridad } from "./types";
+import type { BorradorIncidencia, CategoriaIncidencia, Prioridad, TecnicoAsignado } from "./types";
 
 export const CATEGORIA_META: Record<
   CategoriaIncidencia,
@@ -44,11 +44,38 @@ export const PRIORIDAD_META: Record<
   },
 };
 
-export const BORRADOR_INICIAL = {
+export const TECNICOS_DISPONIBLES: TecnicoAsignado[] = [
+  {
+    id_usuario: "u-tec-morales",
+    nombre: "Ing. Carlos Morales",
+    correo: "tecnico@utm.edu.mx",
+    area: "computo_redes",
+  },
+  {
+    id_usuario: "TEC-0205",
+    nombre: "Ing. Roberto Pech Moo",
+    correo: "roberto.pech@utm.edu.mx",
+    area: "computo_redes",
+  },
+  {
+    id_usuario: "TEC-0412",
+    nombre: "Téc. Miguel Balam Dzib",
+    correo: "miguel.balam@utm.edu.mx",
+    area: "infraestructura",
+  },
+  {
+    id_usuario: "TEC-0518",
+    nombre: "Lic. Sofía Ortiz Lara",
+    correo: "sofia.ortiz@utm.edu.mx",
+    area: "academico",
+  },
+];
+
+export const BORRADOR_INICIAL: BorradorIncidencia = {
   titulo: "",
   descripcion: "",
-  prioridad: "" as const,
-  categoria: "" as const,
+  prioridad: "media",
+  categoria: "",
   ubicacion: {
     edificio: "",
     piso: "",
@@ -57,15 +84,16 @@ export const BORRADOR_INICIAL = {
   reportante: {
     id_usuario: "",
     nombre: "",
-    rol_institucional: "Docente" as const,
-    rol: "Docente" as const,
+    rol_institucional: "Docente",
+    rol: "Docente",
     correo: "",
   },
+  evidencias: [],
   detalle_computo: {
     direccion_ip: "",
     vlan: "",
     puerto_uplink: "",
-    equipos_afectados: [] as string[],
+    equipos_afectados: [],
   },
   detalle_infraestructura: {
     tipo_dano: "",

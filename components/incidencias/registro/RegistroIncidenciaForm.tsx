@@ -1,17 +1,21 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { ChangeEvent, FormEvent, useState } from "react";
 import { useSession } from "@/components/auth/SessionProvider";
 import { CamposUbicacion } from "@/components/incidencias/registro/CamposUbicacion";
 import { CamposUniversales } from "@/components/incidencias/registro/CamposUniversales";
 import { DetalleAcademico } from "@/components/incidencias/registro/DetalleAcademico";
 import { DetalleComputoRedes } from "@/components/incidencias/registro/DetalleComputoRedes";
 import { DetalleInfraestructura } from "@/components/incidencias/registro/DetalleInfraestructura";
-import { Field, inputClass } from "@/components/ui/Field";
 import { BORRADOR_INICIAL, CATEGORIA_META } from "@/lib/incidencias/constants";
 import { armarPayload } from "@/lib/incidencias/payload";
-import { erroresPorCampo, incidenciaCampusSchema } from "@/lib/incidencias/schema";
+import { registroIncidenciaSchema } from "@/lib/incidencias/registro-schema";
+import { erroresPorCampo } from "@/lib/incidencias/schema";
 import { CATEGORIAS, type BorradorIncidencia, type CategoriaIncidencia } from "@/lib/incidencias/types";
+
+const MIME_PERMITIDOS = ["image/png", "image/jpeg", "application/pdf"] as const;
+type MimePermitido = (typeof MIME_PERMITIDOS)[number];
+const MAX_PESO_BYTES = 5 * 1024 * 1024;
 
 export function RegistroIncidenciaForm() {
   const { session } = useSession();
@@ -30,18 +34,58 @@ export function RegistroIncidenciaForm() {
     setMensaje("");
   }
 
+  function agregarEvidencia(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!MIME_PERMITIDOS.includes(file.type as MimePermitido) || file.size > MAX_PESO_BYTES) {
+      setErrores((actual) => ({
+        ...actual,
+        evidencias: "Solo se permiten archivos PNG, JPG o PDF de hasta 5 MB.",
+      }));
+      return;
+    }
+    const peso_kb = Math.max(1, Math.ceil(file.size / 1024));
+    if (borrador.evidencias.some((item) => item.nombre_archivo === file.name)) {
+      setErrores((actual) => ({
+        ...actual,
+        evidencias: "Ese archivo ya está adjunto en el reporte.",
+      }));
+      return;
+    }
+    actualizar("evidencias", [
+      ...borrador.evidencias,
+      { nombre_archivo: file.name, tipo_mime: file.type as MimePermitido, peso_kb },
+    ]);
+  }
+
+  function quitarEvidencia(nombre_archivo: string) {
+    actualizar(
+      "evidencias",
+      borrador.evidencias.filter((item) => item.nombre_archivo !== nombre_archivo),
+    );
+  }
+
   async function enviar(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canCreate) {
+    if (!canCreate || !session) {
       setMensaje("El registro de tickets requiere el rol Reportante o Administrador.");
       return;
     }
-    const payload = armarPayload(borrador);
+    const payload = armarPayload({
+      ...borrador,
+      reportante: {
+        id_usuario: session.id_usuario,
+        nombre: session.name,
+        rol: session.rol_institucional,
+        correo: session.email,
+      },
+    });
     if (!payload) {
-      setMensaje("Completa la prioridad, categoría y todos los datos requeridos.");
+      setMensaje("Selecciona una categoría y completa todos los datos requeridos.");
       return;
     }
-    const result = incidenciaCampusSchema.safeParse(payload);
+    const result = registroIncidenciaSchema.safeParse(payload);
     if (!result.success) {
       setErrores(erroresPorCampo(result.error));
       setMensaje("Revisa los campos marcados antes de enviar.");
@@ -49,7 +93,7 @@ export function RegistroIncidenciaForm() {
     }
     const response = await fetch("/api/incidencias", {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-user-role": "reportante" },
+      headers: { "Content-Type": "application/json", "x-user-role": session.role },
       body: JSON.stringify(result.data),
     });
     const body = await response.json() as { data?: { folio: string }; error?: string };
@@ -62,24 +106,43 @@ export function RegistroIncidenciaForm() {
     setErrores({});
   }
 
-  const reportante = borrador.reportante;
+  const reportante = session
+    ? {
+        id_usuario: session.id_usuario,
+        nombre: session.name,
+        rol: session.rol_institucional,
+        correo: session.email,
+      }
+    : borrador.reportante;
 
   return (
     <form onSubmit={enviar} className="space-y-6" noValidate>
       <section className="rounded-2xl border border-slate-200/80 bg-white/90 p-6 shadow-sm backdrop-blur-md transition-all duration-200 hover:shadow-md sm:p-8">
-        <SectionHeading number="01" title="Datos del ticket" description="Describe la incidencia y elige su prioridad." />
+        <SectionHeading number="01" title="Datos del ticket" description="Describe la incidencia con el mayor detalle posible. La prioridad será asignada por Coordinación." />
         <div className="mt-6"><CamposUniversales value={borrador} errors={errores} onChange={actualizar} /></div>
       </section>
 
       <section className="rounded-2xl border border-slate-200/80 bg-white/90 p-6 shadow-sm backdrop-blur-md transition-all duration-200 hover:shadow-md sm:p-8">
-        <SectionHeading number="02" title="Reportante y ubicación" description="Indica quién reporta y dónde ocurre." />
-        <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          <Field id="id_usuario" label="ID de usuario" error={errores["reportante.id_usuario"]}><input id="id_usuario" value={reportante.id_usuario} onChange={(e) => actualizar("reportante", { ...reportante, id_usuario: e.target.value })} className={inputClass(Boolean(errores["reportante.id_usuario"]))} /></Field>
-          <Field id="nombre" label="Nombre completo" error={errores["reportante.nombre"]}><input id="nombre" value={reportante.nombre} onChange={(e) => actualizar("reportante", { ...reportante, nombre: e.target.value })} className={inputClass(Boolean(errores["reportante.nombre"]))} /></Field>
-          <Field id="correo" label="Correo institucional" error={errores["reportante.correo"]}><input id="correo" type="email" value={reportante.correo} onChange={(e) => actualizar("reportante", { ...reportante, correo: e.target.value })} className={inputClass(Boolean(errores["reportante.correo"]))} /></Field>
-          <Field id="rol" label="Rol" error={errores["reportante.rol"]}><select id="rol" value={reportante.rol} onChange={(e) => actualizar("reportante", { ...reportante, rol: e.target.value as BorradorIncidencia["reportante"]["rol"] })} className={inputClass(Boolean(errores["reportante.rol"]))}><option>Docente</option><option>Estudiante</option><option>Administrativo</option></select></Field>
+        <SectionHeading number="02" title="Reportante y ubicación" description="Tus datos se toman automáticamente de tu sesión. Indica la ubicación del incidente." />
+        <div className="mt-6 grid gap-3 rounded-2xl border border-teal-100 bg-teal-50/40 p-4 sm:grid-cols-4">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-teal-700">Nombre</p>
+            <p className="mt-0.5 text-sm font-semibold text-slate-900">{reportante.nombre}</p>
+          </div>
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-teal-700">Rol institucional</p>
+            <p className="mt-0.5 text-sm font-medium text-slate-700">{reportante.rol}</p>
+          </div>
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-teal-700">Correo</p>
+            <p className="mt-0.5 truncate font-mono text-xs text-slate-700">{reportante.correo}</p>
+          </div>
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-teal-700">ID de usuario</p>
+            <p className="mt-0.5 font-mono text-xs text-slate-700">{reportante.id_usuario}</p>
+          </div>
         </div>
-        <div className="mt-6 rounded-2xl border border-slate-100 bg-slate-50/80 p-4"><CamposUbicacion value={borrador.ubicacion} errors={errores} onChange={(value) => actualizar("ubicacion", value)} /></div>
+        <div className="mt-5 rounded-2xl border border-slate-100 bg-slate-50/80 p-4"><CamposUbicacion value={borrador.ubicacion} errors={errores} onChange={(value) => actualizar("ubicacion", value)} /></div>
       </section>
 
       <section className="rounded-2xl border border-slate-200/80 bg-white/90 p-6 shadow-sm backdrop-blur-md transition-all duration-200 hover:shadow-md sm:p-8">
@@ -97,6 +160,45 @@ export function RegistroIncidenciaForm() {
         <div className="mt-6 rounded-2xl border border-teal-200 bg-teal-50/30 p-5">
           <p className="font-mono text-xs font-bold text-teal-700">Detalle específico {borrador.categoria ? `· ${borrador.categoria}` : ""}</p>
           <div className="mt-4">{borrador.categoria === "computo_redes" ? <DetalleComputoRedes value={borrador.detalle_computo} errors={errores} onChange={(value) => actualizar("detalle_computo", value)} /> : null}{borrador.categoria === "infraestructura" ? <DetalleInfraestructura value={borrador.detalle_infraestructura} errors={errores} onChange={(value) => actualizar("detalle_infraestructura", value)} /> : null}{borrador.categoria === "academico" ? <DetalleAcademico value={borrador.detalle_academico} errors={errores} onChange={(value) => actualizar("detalle_academico", value)} /> : null}{!borrador.categoria ? <p className="text-sm text-slate-500">Selecciona una categoría para mostrar sus campos exclusivos.</p> : null}</div>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-slate-200/80 bg-white/90 p-6 shadow-sm backdrop-blur-md transition-all duration-200 hover:shadow-md sm:p-8">
+        <SectionHeading number="04" title="Evidencia adjunta" description="Adjunta capturas, fotografías o documentos del incidente (PNG, JPG o PDF de hasta 5 MB)." />
+        <div className="mt-6">
+          <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-slate-50/70 px-6 py-6 text-center transition hover:border-teal-500 hover:bg-teal-50/30">
+            <span className="text-sm font-semibold text-teal-800">Seleccionar archivo de evidencia</span>
+            <span className="mt-1 text-xs text-slate-500">Formatos permitidos: PNG, JPG o PDF · Máximo 5 MB por archivo</span>
+            <input
+              disabled={!canCreate}
+              type="file"
+              accept="image/png,image/jpeg,application/pdf"
+              onChange={agregarEvidencia}
+              className="sr-only"
+            />
+          </label>
+          {errores.evidencias ? <p className="mt-2 text-sm text-rose-700" role="alert">{errores.evidencias}</p> : null}
+          {borrador.evidencias.length > 0 ? (
+            <ul className="mt-4 space-y-2">
+              {borrador.evidencias.map((item) => (
+                <li key={item.nombre_archivo} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs">
+                  <div>
+                    <p className="font-semibold text-slate-900">{item.nombre_archivo}</p>
+                    <p className="mt-0.5 text-slate-500">{item.tipo_mime} · {item.peso_kb} KB</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => quitarEvidencia(item.nombre_archivo)}
+                    className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 font-semibold text-rose-700 hover:bg-rose-100"
+                  >
+                    Quitar
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-3 text-xs text-slate-500">Aún no has adjuntado archivos a este reporte.</p>
+          )}
         </div>
       </section>
 

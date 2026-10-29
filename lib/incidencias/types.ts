@@ -26,6 +26,13 @@ export type UbicacionCampus = {
   aula_laboratorio: string;
 };
 
+export type TecnicoAsignado = {
+  id_usuario: string;
+  nombre: string;
+  correo: string;
+  area: CategoriaIncidencia;
+};
+
 export type DetalleComputoRedes = {
   direccion_ip: string;
   vlan: number;
@@ -88,6 +95,7 @@ export type IncidenciaCampus = {
     correo: string;
     rol?: RolReportante;
   };
+  tecnico_asignado?: TecnicoAsignado;
   ubicacion: UbicacionCampus;
   detalle_especifico: DetalleEspecifico;
   tags: string[];
@@ -102,10 +110,18 @@ export type BorradorDetalleComputo = Omit<DetalleComputoRedes, "vlan" | "equipos
 
 export type BorradorDetalleInfraestructura = DetalleInfraestructura;
 
+export type TipoMimeEvidencia = "image/png" | "image/jpeg" | "application/pdf";
+
+export type BorradorEvidencia = {
+  nombre_archivo: string;
+  tipo_mime: TipoMimeEvidencia;
+  peso_kb: number;
+};
+
 export type BorradorIncidencia = {
   titulo: string;
   descripcion: string;
-  prioridad: Prioridad | "";
+  prioridad: Prioridad;
   categoria: CategoriaIncidencia | "";
   ubicacion: UbicacionCampus;
   reportante: {
@@ -115,6 +131,7 @@ export type BorradorIncidencia = {
     rol: RolReportante;
     correo: string;
   };
+  evidencias: BorradorEvidencia[];
   detalle_computo: BorradorDetalleComputo;
   detalle_infraestructura: BorradorDetalleInfraestructura;
   detalle_academico: DetalleAcademico;

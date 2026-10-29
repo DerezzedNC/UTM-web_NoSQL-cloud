@@ -14,46 +14,23 @@ export function DetalleInfraestructura({
 }: DetalleInfraestructuraProps) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
-      <Field
-        id="tipo_dano"
-        label="Tipo de daño"
-        error={errors["detalle_especifico.tipo_dano"]}
-      >
-        <input
+      <div className="sm:col-span-2">
+        <Field
           id="tipo_dano"
-          value={value.tipo_dano}
-          onChange={(event) =>
-            onChange({ ...value, tipo_dano: event.target.value })
-          }
-          placeholder="Fuga, cortocircuito, desprendimiento…"
-          className={inputClass(Boolean(errors["detalle_especifico.tipo_dano"]))}
-        />
-      </Field>
-      <Field
-        id="riesgo_seguridad"
-        label="Riesgo de seguridad"
-        error={errors["detalle_especifico.riesgo_seguridad"]}
-      >
-        <select
-          id="riesgo_seguridad"
-          value={value.riesgo_seguridad}
-          onChange={(event) =>
-            onChange({
-              ...value,
-              riesgo_seguridad:
-                event.target.value as DetalleInfraestructuraValue["riesgo_seguridad"],
-            })
-          }
-          className={inputClass(
-            Boolean(errors["detalle_especifico.riesgo_seguridad"]),
-          )}
+          label="Tipo de daño"
+          error={errors["detalle_especifico.tipo_dano"]}
         >
-          <option value="Bajo">Bajo</option>
-          <option value="Medio">Medio</option>
-          <option value="Alto">Alto</option>
-          <option value="Crítico">Crítico</option>
-        </select>
-      </Field>
+          <input
+            id="tipo_dano"
+            value={value.tipo_dano}
+            onChange={(event) =>
+              onChange({ ...value, tipo_dano: event.target.value })
+            }
+            placeholder="Fuga, cortocircuito, desprendimiento…"
+            className={inputClass(Boolean(errors["detalle_especifico.tipo_dano"]))}
+          />
+        </Field>
+      </div>
       <label className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-800">
         <input
           type="checkbox"

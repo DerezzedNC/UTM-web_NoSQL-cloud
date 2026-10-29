@@ -163,7 +163,15 @@ export async function POST(request: Request) {
         comentario: "Incidencia registrada en UTM Desk.",
       },
     ],
-    evidencias_adjuntas: [],
+    evidencias_adjuntas: Array.isArray(payload.evidencias)
+      ? payload.evidencias.map((item) => ({
+          nombre_archivo: item.nombre_archivo,
+          tipo_mime: item.tipo_mime,
+          peso_kb: item.peso_kb,
+          url_storage: `incidencias/${folio}/${item.nombre_archivo}`,
+          fecha_carga: now,
+        }))
+      : [],
     detalle_especifico: payload.detalle_especifico,
   };
 

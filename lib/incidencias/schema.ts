@@ -70,6 +70,12 @@ export const reportanteSchema = z.preprocess(
   }).strict()
 );
 
+export const evidenciaBorradorSchema = z.object({
+  nombre_archivo: z.string().trim().min(1),
+  tipo_mime: z.enum(["image/png", "image/jpeg", "application/pdf"]),
+  peso_kb: z.number().min(0).max(5120),
+});
+
 export const camposUniversalesSchema = z.object({
   titulo: z
     .string()
@@ -80,15 +86,19 @@ export const camposUniversalesSchema = z.object({
     .string()
     .trim()
     .min(15, "La descripción debe tener al menos 15 caracteres."),
-  prioridad: z.enum(["baja", "media", "alta", "critica"], {
-    error: "Selecciona una prioridad.",
-  }),
+  prioridad: z.preprocess(
+    (val) => (val === undefined || val === null || val === "" ? "media" : val),
+    z.enum(["baja", "media", "alta", "critica"], {
+      error: "Selecciona una prioridad.",
+    })
+  ).default("media"),
   ubicacion: ubicacionSchema,
   reportante: reportanteSchema,
   tags: z.preprocess(
     (val) => (val === undefined || val === null ? [] : val),
     z.array(z.string().trim().min(1)).default([])
   ),
+  evidencias: z.array(evidenciaBorradorSchema).optional().default([]),
 });
 
 const camposUniversales = camposUniversalesSchema.shape;

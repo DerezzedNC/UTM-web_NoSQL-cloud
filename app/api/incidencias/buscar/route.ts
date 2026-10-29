@@ -60,6 +60,9 @@ const buscarParamsSchema = z.object({
       .min(1, "El límite mínimo es 1.")
       .max(100, "El límite máximo es 100.")
   ),
+  rol: z.preprocess(emptyToUndefined, z.string().optional()),
+  id_usuario: z.preprocess(emptyToUndefined, z.string().optional()),
+  correo: z.preprocess(emptyToUndefined, z.string().optional()),
 });
 
 function escapeRegex(text: string): string {
@@ -173,6 +176,9 @@ export async function GET(request: Request) {
     edificio: searchParams.get("edificio"),
     page: searchParams.get("page"),
     limit: searchParams.get("limit"),
+    rol: searchParams.get("rol"),
+    id_usuario: searchParams.get("id_usuario"),
+    correo: searchParams.get("correo"),
   };
 
   const parseResult = buscarParamsSchema.safeParse(rawParams);
@@ -200,21 +206,47 @@ export async function GET(request: Request) {
     );
   }
 
-  // 5. Construcción de consulta estructurada
-  const baseFilter: Record<string, unknown> = {};
+  // 5. Construcción de consulta estructurada con scoping por rol del servidor
+  const andClauses: Record<string, unknown>[] = [];
+
+  // Scoping seguro basado en la identidad verificada en el servidor (nunca en query params)
+  if (sessionUser.rol === "reportante") {
+    andClauses.push({
+      $or: [
+        { "reportante.id_usuario": sessionUser.id_usuario },
+        { "reportante.correo": sessionUser.correo.toLowerCase() },
+      ],
+    });
+  } else if (sessionUser.rol === "tecnico") {
+    andClauses.push({
+      $or: [
+        { "tecnico_asignado.id_usuario": sessionUser.id_usuario },
+        { "tecnico_asignado.correo": sessionUser.correo.toLowerCase() },
+      ],
+    });
+  }
 
   if (categoria) {
-    baseFilter.categoria = categoria;
+    andClauses.push({ categoria });
   }
   if (estado) {
-    baseFilter.estado = estado;
+    andClauses.push({ estado });
   }
   if (edificio) {
-    baseFilter["ubicacion.edificio"] = {
-      $regex: escapeRegex(edificio),
-      $options: "i",
-    };
+    andClauses.push({
+      "ubicacion.edificio": {
+        $regex: escapeRegex(edificio),
+        $options: "i",
+      },
+    });
   }
+
+  const buildFinalFilter = (extraClauses: Record<string, unknown>[] = []): Record<string, unknown> => {
+    const all = [...andClauses, ...extraClauses];
+    if (all.length === 0) return {};
+    if (all.length === 1) return all[0];
+    return { $and: all };
+  };
 
   const skip = (page - 1) * limit;
   const col = db.collection("incidencias_campus");
@@ -225,7 +257,7 @@ export async function GET(request: Request) {
   try {
     if (q) {
       try {
-        const textFilter = { ...baseFilter, $text: { $search: q } };
+        const textFilter = buildFinalFilter([{ $text: { $search: q } }]);
         total = await col.countDocuments(textFilter);
         rawDocs = await col
           .find(textFilter, { projection: { score: { $meta: "textScore" } } })
@@ -247,13 +279,14 @@ export async function GET(request: Request) {
           msg.includes("indexnotfound");
 
         if (isMissingTextIndex) {
-          const regexFilter = {
-            ...baseFilter,
-            $or: [
-              { titulo: { $regex: escapeRegex(q), $options: "i" } },
-              { descripcion: { $regex: escapeRegex(q), $options: "i" } },
-            ],
-          };
+          const regexFilter = buildFinalFilter([
+            {
+              $or: [
+                { titulo: { $regex: escapeRegex(q), $options: "i" } },
+                { descripcion: { $regex: escapeRegex(q), $options: "i" } },
+              ],
+            },
+          ]);
           total = await col.countDocuments(regexFilter);
           rawDocs = await col
             .find(regexFilter)
@@ -267,9 +300,10 @@ export async function GET(request: Request) {
         }
       }
     } else {
-      total = await col.countDocuments(baseFilter);
+      const finalFilter = buildFinalFilter();
+      total = await col.countDocuments(finalFilter);
       rawDocs = await col
-        .find(baseFilter)
+        .find(finalFilter)
         .sort({ fecha_creacion: -1, _id: -1 })
         .skip(skip)
         .limit(limit)
