@@ -37,7 +37,7 @@ const permissions: Record<FrontendRole, readonly Permission[]> = {
 };
 
 export function hasPermission(role: FrontendRole, permission: Permission) {
-  return permissions[role].includes(permission);
+  return permissions[role]?.includes(permission) ?? false;
 }
 
 export function canCloseTicket(role: FrontendRole) {
