@@ -16,11 +16,13 @@ let bucketVerified = false;
 export function normalizarSupabaseUrl(rawUrl: string): string {
   const limpia = rawUrl.trim().replace(/^["']|["']$/g, "");
 
+  // Si pegaron el link del dashboard: https://supabase.com/dashboard/project/xyz...
   const matchDashboard = limpia.match(/supabase\.com\/dashboard\/project\/([a-z0-9]+)/i);
   if (matchDashboard?.[1]) {
     return `https://${matchDashboard[1]}.supabase.co`;
   }
 
+  // Extraer únicamente el origen https://xyz.supabase.co sin rutas adicionales
   const urlObj = new URL(limpia);
   return urlObj.origin;
 }

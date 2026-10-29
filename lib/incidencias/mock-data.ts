@@ -28,7 +28,14 @@ const evidencia = (
   peso_kb: number,
   url_storage: string,
   fecha_carga: string,
-): EvidenciaAdjunta => ({ nombre_archivo, tipo_mime, peso_kb, url_storage, fecha_carga });
+): EvidenciaAdjunta => ({
+  nombre_archivo,
+  tipo_mime,
+  peso_kb,
+  url_storage,
+  storage_key: url_storage,
+  fecha_carga,
+});
 
 const base = (
   _id: string,
@@ -114,19 +121,19 @@ export const INCIDENCIAS_INICIALES: IncidenciaDetalle[] = [
     "en proceso",
     2.5,
     "2026-03-18T09:30:00-06:00",
-    { id_usuario: "u-carlos-mendez", nombre: "Carlos Méndez", rol: "Docente", correo: "reportante@utm.edu.mx" },
+    { id_usuario: "DOC-1042", nombre: "Mtro. Carlos Méndez Cetina", rol: "Docente", correo: "carlos.docente@utm.edu.mx" },
     { edificio: "Edificio C", piso: "Nivel 1", aula_laboratorio: "Lab. Cómputo 3" },
     { direccion_ip: "10.24.110.22", vlan: 40, puerto_uplink: "Gi0/48", equipos_afectados: 42 },
     ["red", "switch", "conectividad"],
     [
-      evento("2026-03-18T10:14:00-06:00", "Ing. Carlos Morales", "en proceso", 2.5, "Se confirmó la caída intermitente del puerto Gi0/48; en revisión."),
-      evento("2026-03-18T09:45:00-06:00", "Lic. Mariana Valenzuela", "abierta", 0, "Asignada al Ing. Carlos Morales con prioridad Alta."),
+      evento("2026-03-18T10:14:00-06:00", "Ing. Roberto Pech Moo", "en proceso", 2.5, "Se confirmó la caída intermitente del puerto Gi0/48; en revisión."),
+      evento("2026-03-18T09:45:00-06:00", "Ing. Luis Briceño Tun", "abierta", 0, "Asignada al Ing. Roberto Pech Moo con prioridad Alta."),
     ],
     [evidencia("captura-switch.png", "image/png", 930, "incidencias/INC-2026-0002/captura-switch.png", "2026-03-18T09:30:00-06:00")],
     {
-      id_usuario: "u-tec-morales",
-      nombre: "Ing. Carlos Morales",
-      correo: "tecnico@utm.edu.mx",
+      id_usuario: "TEC-0205",
+      nombre: "Ing. Roberto Pech Moo",
+      correo: "roberto.pech@utm.edu.mx",
       area: "computo_redes",
     },
   ),
@@ -140,11 +147,11 @@ export const INCIDENCIAS_INICIALES: IncidenciaDetalle[] = [
     "abierta",
     0,
     "2026-03-17T14:00:00-06:00",
-    { id_usuario: "u-carlos-mendez", nombre: "Carlos Méndez", rol: "Docente", correo: "reportante@utm.edu.mx" },
+    { id_usuario: "DOC-1042", nombre: "Mtro. Carlos Méndez Cetina", rol: "Docente", correo: "carlos.docente@utm.edu.mx" },
     { edificio: "Edificio A", piso: "Nivel 3", aula_laboratorio: "Aula A-304" },
     { plataforma: "Moodle UTM", codigo_curso: "SIS-402", periodo_escolar: "2026-1", estudiantes_impactados: 38 },
     [],
-    [evento("2026-03-17T14:00:00-06:00", "Carlos Méndez", "abierta", 0, "Incidencia creada por el reportante. Pendiente de clasificación y asignación por Coordinación.")],
+    [evento("2026-03-17T14:00:00-06:00", "Mtro. Carlos Méndez Cetina", "abierta", 0, "Incidencia creada por el reportante. Pendiente de clasificación y asignación por Coordinación.")],
     [evidencia("error-moodle.pdf", "application/pdf", 410, "incidencias/INC-2026-0003/error-moodle.pdf", "2026-03-17T14:00:00-06:00")],
   ),
 ];

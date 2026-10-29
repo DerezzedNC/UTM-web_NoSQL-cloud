@@ -74,7 +74,7 @@ export type EvidenciaAdjunta = {
   peso_kb: number;
   storage_key?: string;
   url_storage?: string;
-  url_firmada?: string;
+  url_firmada?: string | null;
   fecha_carga: string;
 };
 
@@ -117,6 +117,8 @@ export type BorradorEvidencia = {
   nombre_archivo: string;
   tipo_mime: TipoMimeEvidencia;
   peso_kb: number;
+  contenido_base64?: string;
+  preview_url?: string;
 };
 
 export type BorradorIncidencia = {

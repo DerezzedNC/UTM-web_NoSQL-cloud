@@ -74,6 +74,7 @@ export const evidenciaBorradorSchema = z.object({
   nombre_archivo: z.string().trim().min(1),
   tipo_mime: z.enum(["image/png", "image/jpeg", "application/pdf"]),
   peso_kb: z.number().min(0).max(5120),
+  contenido_base64: z.string().optional(),
 });
 
 export const camposUniversalesSchema = z.object({

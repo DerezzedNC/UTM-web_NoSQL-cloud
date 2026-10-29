@@ -23,6 +23,7 @@ export function RegistroIncidenciaForm() {
   const [borrador, setBorrador] = useState<BorradorIncidencia>(BORRADOR_INICIAL);
   const [errores, setErrores] = useState<Record<string, string>>({});
   const [mensaje, setMensaje] = useState("");
+  const [subiendo, setSubiendo] = useState(false);
 
   function actualizar<K extends keyof BorradorIncidencia>(campo: K, valor: BorradorIncidencia[K]) {
     setBorrador((actual) => ({ ...actual, [campo]: valor }));
@@ -45,7 +46,7 @@ export function RegistroIncidenciaForm() {
       }));
       return;
     }
-    const peso_kb = Math.max(1, Math.ceil(file.size / 1024));
+    const peso_kb = Number((file.size / 1024).toFixed(2));
     if (borrador.evidencias.some((item) => item.nombre_archivo === file.name)) {
       setErrores((actual) => ({
         ...actual,
@@ -53,10 +54,30 @@ export function RegistroIncidenciaForm() {
       }));
       return;
     }
-    actualizar("evidencias", [
-      ...borrador.evidencias,
-      { nombre_archivo: file.name, tipo_mime: file.type as MimePermitido, peso_kb },
-    ]);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = typeof reader.result === "string" ? reader.result : "";
+      const base64Part = dataUrl.includes(",") ? dataUrl.split(",")[1] : "";
+      setBorrador((actual) => ({
+        ...actual,
+        evidencias: [
+          ...actual.evidencias,
+          {
+            nombre_archivo: file.name,
+            tipo_mime: file.type as MimePermitido,
+            peso_kb,
+            contenido_base64: base64Part,
+            preview_url: dataUrl,
+          },
+        ],
+      }));
+      setErrores((actual) => {
+        const next = { ...actual };
+        delete next.evidencias;
+        return next;
+      });
+    };
+    reader.readAsDataURL(file);
   }
 
   function quitarEvidencia(nombre_archivo: string) {
@@ -91,19 +112,32 @@ export function RegistroIncidenciaForm() {
       setMensaje("Revisa los campos marcados antes de enviar.");
       return;
     }
-    const response = await fetch("/api/incidencias", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-user-role": session.role },
-      body: JSON.stringify(result.data),
-    });
-    const body = await response.json() as { data?: { folio: string }; error?: string };
-    if (!response.ok) {
-      setMensaje(body.error ?? "No se pudo crear la incidencia.");
-      return;
+    setSubiendo(true);
+    try {
+      const response = await fetch("/api/incidencias", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-user-role": session.role },
+        body: JSON.stringify(result.data),
+      });
+      const body = (await response.json()) as { data?: { folio: string }; error?: string };
+      if (!response.ok) {
+        setMensaje(body.error ?? "No se pudo crear la incidencia.");
+        return;
+      }
+      setMensaje(`Ticket creado correctamente en MongoDB y Supabase: ${body.data?.folio ?? "sin folio"}.`);
+      setBorrador({
+        ...BORRADOR_INICIAL,
+        reportante: {
+          id_usuario: session.id_usuario,
+          nombre: session.name,
+          rol: session.rol_institucional,
+          correo: session.email,
+        },
+      });
+      setErrores({});
+    } finally {
+      setSubiendo(false);
     }
-    setMensaje(`Ticket creado correctamente: ${body.data?.folio ?? "sin folio"}.`);
-    setBorrador(BORRADOR_INICIAL);
-    setErrores({});
   }
 
   const reportante = session
@@ -179,20 +213,30 @@ export function RegistroIncidenciaForm() {
           </label>
           {errores.evidencias ? <p className="mt-2 text-sm text-rose-700" role="alert">{errores.evidencias}</p> : null}
           {borrador.evidencias.length > 0 ? (
-            <ul className="mt-4 space-y-2">
+            <ul className="mt-4 grid gap-3 sm:grid-cols-2">
               {borrador.evidencias.map((item) => (
-                <li key={item.nombre_archivo} className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-xs">
-                  <div>
-                    <p className="font-semibold text-slate-900">{item.nombre_archivo}</p>
-                    <p className="mt-0.5 text-slate-500">{item.tipo_mime} · {item.peso_kb} KB</p>
+                <li key={item.nombre_archivo} className="overflow-hidden rounded-xl border border-slate-200 bg-white p-3 text-xs shadow-xs">
+                  {item.tipo_mime.startsWith("image/") && item.preview_url ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={item.preview_url}
+                      alt={item.nombre_archivo}
+                      className="mb-2.5 h-36 w-full rounded-lg border border-slate-100 bg-slate-50 object-cover"
+                    />
+                  ) : null}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold text-slate-900">{item.nombre_archivo}</p>
+                      <p className="mt-0.5 text-slate-500">{item.tipo_mime} · {item.peso_kb} KB</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => quitarEvidencia(item.nombre_archivo)}
+                      className="shrink-0 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 font-semibold text-rose-700 hover:bg-rose-100"
+                    >
+                      Quitar
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => quitarEvidencia(item.nombre_archivo)}
-                    className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 font-semibold text-rose-700 hover:bg-rose-100"
-                  >
-                    Quitar
-                  </button>
                 </li>
               ))}
             </ul>
@@ -203,7 +247,9 @@ export function RegistroIncidenciaForm() {
       </section>
 
       {mensaje ? <p role="status" className="rounded-2xl border border-teal-200 bg-teal-50 p-4 text-sm font-semibold text-teal-800">{mensaje}</p> : null}
-      <button disabled={!canCreate} type="submit" className="w-full rounded-lg bg-[#11695c] px-5 py-3 text-sm font-medium text-white transition hover:bg-[#0d5449] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">Registrar incidencia</button>
+      <button disabled={!canCreate || subiendo} type="submit" className="w-full rounded-lg bg-[#11695c] px-5 py-3 text-sm font-medium text-white transition hover:bg-[#0d5449] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto">
+        {subiendo ? "Subiendo evidencia y registrando..." : "Registrar incidencia"}
+      </button>
     </form>
   );
 }

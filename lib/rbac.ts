@@ -9,6 +9,7 @@ export type Permission =
   | "incidencia:create"
   | "evidencia:upload"
   | "incidencia:triage"
+  | "evidencia:upload"
   | "incidencia:update"
   | "incidencia:tags"
   | "incidencia:read"
@@ -27,6 +28,7 @@ const permissions: Record<FrontendRole, readonly Permission[]> = {
     "incidencia:create",
     "evidencia:upload",
     "incidencia:triage",
+    "evidencia:upload",
     "incidencia:update",
     "incidencia:tags",
     "incidencia:read",
