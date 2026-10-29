@@ -197,14 +197,18 @@ export default function IncidenciaDetallePage({ params }: { params: Promise<{ id
         method: "POST",
         body: formData,
       });
-      const body = (await res.json()) as { data?: EvidenciaAdjunta; error?: string };
+      const body = (await res.json()) as {
+        data?: EvidenciaAdjunta;
+        evidencias_adjuntas?: EvidenciaAdjunta[];
+        error?: string;
+      };
       if (!res.ok || !body.data) {
         setEvidenceError(body.error ?? "No se pudo subir la evidencia.");
         return;
       }
       setTicket({
         ...ticket,
-        evidencias_adjuntas: [body.data, ...ticket.evidencias_adjuntas],
+        evidencias_adjuntas: body.evidencias_adjuntas ?? [body.data, ...ticket.evidencias_adjuntas],
       });
       setNotice(`Evidencia adjuntada exitosamente: ${file.name}`);
     } catch {

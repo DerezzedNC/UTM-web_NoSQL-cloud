@@ -1,7 +1,7 @@
 import test, { describe, beforeEach, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { ObjectId, type MongoClient } from "mongodb";
-import { POST } from "../app/api/incidencias/[id]/evidencias/route";
+import { GET, POST } from "../app/api/incidencias/[id]/evidencias/route";
 import { createSessionToken, type AuthUser } from "../lib/auth";
 import { setSupabaseClientForTesting } from "../lib/supabase";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -364,7 +364,7 @@ describe("POST /api/incidencias/[id]/evidencias - Carga en Supabase Storage y Mo
     assert.ok(bitacora.some((b) => b.comentario.includes("Se adjuntó evidencia")));
   });
 
-  test("4. Técnico asignado adjunta evidencia técnica vía FormData exitosamente", async () => {
+  test("4. Técnico asignado adjunta evidencia técnica vía FormData ('file') exitosamente", async () => {
     const token = await createSessionToken(tecnicoAssigned);
     const formData = new FormData();
     const fakeFile = new File([Buffer.from("%PDF-1.4 test document")], "diagnostico.pdf", {
@@ -384,9 +384,42 @@ describe("POST /api/incidencias/[id]/evidencias - Carga en Supabase Storage y Mo
     assert.equal(res.status, 201);
     const body = (await res.json()) as {
       data: { nombre_archivo: string; tipo_mime: string };
+      evidencias_adjuntas: Array<{ nombre_archivo: string; tipo_mime: string }>;
     };
     assert.equal(body.data.nombre_archivo, "diagnostico.pdf");
     assert.equal(body.data.tipo_mime, "application/pdf");
+    assert.ok(Array.isArray(body.evidencias_adjuntas));
+    assert.equal(body.evidencias_adjuntas.length, 1);
+    assert.equal(body.evidencias_adjuntas[0].nombre_archivo, "diagnostico.pdf");
+  });
+
+  test("4. Acepta archivo vía campo alternativo 'archivo' en FormData con contrato dual", async () => {
+    const token = await createSessionToken(tecnicoAssigned);
+    const formData = new FormData();
+    const fakeFile = new File([Buffer.from("%PDF-1.4 test document 2")], "informe_campo.pdf", {
+      type: "application/pdf",
+    });
+    formData.append("archivo", fakeFile);
+
+    const req = new Request("http://localhost:3000/api/incidencias/65fabc1234567890abcdef01/evidencias", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    const res = await POST(req, { params: Promise.resolve({ id: "65fabc1234567890abcdef01" }) });
+    assert.equal(res.status, 201);
+    const body = (await res.json()) as {
+      data: { nombre_archivo: string; tipo_mime: string };
+      evidencias_adjuntas: Array<{ nombre_archivo: string; tipo_mime: string }>;
+    };
+    assert.equal(body.data.nombre_archivo, "informe_campo.pdf");
+    assert.equal(body.data.tipo_mime, "application/pdf");
+    assert.ok(Array.isArray(body.evidencias_adjuntas));
+    assert.equal(body.evidencias_adjuntas.length, 1);
+    assert.equal(body.evidencias_adjuntas[0].nombre_archivo, "informe_campo.pdf");
   });
 
   test("5. Retorna HTTP 503 cuando Supabase Storage no está configurado en el servidor", async () => {
@@ -432,5 +465,146 @@ describe("POST /api/incidencias/[id]/evidencias - Carga en Supabase Storage y Mo
 
     const res = await POST(req, { params: Promise.resolve({ id: "65fabc1234567890abcdef01" }) });
     assert.equal(res.status, 502);
+  });
+
+  // ==========================================================================
+  // 6. CONSULTA DE EVIDENCIAS (GET /api/incidencias/[id]/evidencias)
+  // ==========================================================================
+  test("6. GET - Rechaza consulta sin sesión con HTTP 401", async () => {
+    const req = new Request("http://localhost:3000/api/incidencias/65fabc1234567890abcdef01/evidencias", {
+      method: "GET",
+    });
+    const res = await GET(req, { params: Promise.resolve({ id: "65fabc1234567890abcdef01" }) });
+    assert.equal(res.status, 401);
+  });
+
+  test("6. GET - Rechaza con HTTP 403 si un reportante intenta consultar evidencias de un ticket ajeno", async () => {
+    const token = await createSessionToken(reportanteOther);
+    const req = new Request("http://localhost:3000/api/incidencias/65fabc1234567890abcdef01/evidencias", {
+      method: "GET",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    const res = await GET(req, { params: Promise.resolve({ id: "65fabc1234567890abcdef01" }) });
+    assert.equal(res.status, 403);
+    const body = (await res.json()) as { error: string };
+    assert.match(body.error, /expediente ajeno/i);
+  });
+
+  test("6. GET - Rechaza con HTTP 403 si un técnico no asignado intenta consultar evidencias", async () => {
+    const token = await createSessionToken(tecnicoOther);
+    const req = new Request("http://localhost:3000/api/incidencias/65fabc1234567890abcdef01/evidencias", {
+      method: "GET",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    const res = await GET(req, { params: Promise.resolve({ id: "65fabc1234567890abcdef01" }) });
+    assert.equal(res.status, 403);
+    const body = (await res.json()) as { error: string };
+    assert.match(body.error, /técnico asignado/i);
+  });
+
+  test("6. GET - Retorna HTTP 404 si la incidencia no existe", async () => {
+    const token = await createSessionToken(reportanteOwner);
+    const req = new Request("http://localhost:3000/api/incidencias/65fabc999999999999999999/evidencias", {
+      method: "GET",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    const res = await GET(req, { params: Promise.resolve({ id: "65fabc999999999999999999" }) });
+    assert.equal(res.status, 404);
+  });
+
+  test("6. GET - Reportante dueño consulta evidencias y obtiene URLs firmadas exitosamente (HTTP 200)", async () => {
+    const doc = sampleIncidencia({
+      evidencias_adjuntas: [
+        {
+          nombre_archivo: "falla_puerto.png",
+          tipo_mime: "image/png",
+          peso_kb: 120,
+          storage_key: "evidencias-utm/65fabc1234567890abcdef01/falla_puerto.png",
+          fecha_carga: new Date("2026-10-28T10:00:00.000Z"),
+        },
+      ],
+    });
+    mockDbStorage.set(String(doc._id), doc);
+
+    const token = await createSessionToken(reportanteOwner);
+    const req = new Request("http://localhost:3000/api/incidencias/65fabc1234567890abcdef01/evidencias", {
+      method: "GET",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    const res = await GET(req, { params: Promise.resolve({ id: "65fabc1234567890abcdef01" }) });
+    assert.equal(res.status, 200);
+    const body = (await res.json()) as {
+      evidencias_adjuntas: Array<{
+        nombre_archivo: string;
+        tipo_mime: string;
+        peso_kb: number;
+        storage_key?: string;
+        url_firmada?: string;
+        fecha_carga: string;
+      }>;
+    };
+
+    assert.ok(Array.isArray(body.evidencias_adjuntas));
+    assert.equal(body.evidencias_adjuntas.length, 1);
+    assert.equal(body.evidencias_adjuntas[0].nombre_archivo, "falla_puerto.png");
+    assert.equal(body.evidencias_adjuntas[0].tipo_mime, "image/png");
+    assert.ok(body.evidencias_adjuntas[0].url_firmada?.includes("token=signed123"));
+  });
+
+  test("6. GET - Coordinador consulta evidencias de cualquier incidencia exitosamente", async () => {
+    const doc = sampleIncidencia({
+      evidencias_adjuntas: [
+        {
+          nombre_archivo: "red_topo.pdf",
+          tipo_mime: "application/pdf",
+          peso_kb: 500,
+          storage_key: "evidencias-utm/65fabc1234567890abcdef01/red_topo.pdf",
+          fecha_carga: new Date("2026-10-28T11:00:00.000Z"),
+        },
+      ],
+    });
+    mockDbStorage.set(String(doc._id), doc);
+
+    const token = await createSessionToken(coordinadorUser);
+    const req = new Request("http://localhost:3000/api/incidencias/65fabc1234567890abcdef01/evidencias", {
+      method: "GET",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    const res = await GET(req, { params: Promise.resolve({ id: "65fabc1234567890abcdef01" }) });
+    assert.equal(res.status, 200);
+    const body = (await res.json()) as {
+      evidencias_adjuntas: Array<{ nombre_archivo: string; url_firmada?: string }>;
+    };
+    assert.equal(body.evidencias_adjuntas.length, 1);
+    assert.equal(body.evidencias_adjuntas[0].nombre_archivo, "red_topo.pdf");
+    assert.ok(body.evidencias_adjuntas[0].url_firmada?.includes("token=signed123"));
+  });
+
+  test("6. GET - Técnico asignado consulta evidencias exitosamente", async () => {
+    const doc = sampleIncidencia({
+      evidencias_adjuntas: [
+        {
+          nombre_archivo: "diagnostico_final.pdf",
+          tipo_mime: "application/pdf",
+          peso_kb: 300,
+          storage_key: "evidencias-utm/65fabc1234567890abcdef01/diagnostico_final.pdf",
+          fecha_carga: new Date("2026-10-28T12:00:00.000Z"),
+        },
+      ],
+    });
+    mockDbStorage.set(String(doc._id), doc);
+
+    const token = await createSessionToken(tecnicoAssigned);
+    const req = new Request("http://localhost:3000/api/incidencias/65fabc1234567890abcdef01/evidencias", {
+      method: "GET",
+      headers: { authorization: `Bearer ${token}` },
+    });
+    const res = await GET(req, { params: Promise.resolve({ id: "65fabc1234567890abcdef01" }) });
+    assert.equal(res.status, 200);
+    const body = (await res.json()) as {
+      evidencias_adjuntas: Array<{ nombre_archivo: string; url_firmada?: string }>;
+    };
+    assert.equal(body.evidencias_adjuntas.length, 1);
+    assert.equal(body.evidencias_adjuntas[0].nombre_archivo, "diagnostico_final.pdf");
   });
 });
