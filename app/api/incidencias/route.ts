@@ -30,10 +30,11 @@ export async function POST(request: Request) {
   const year = new Date().getFullYear();
   const nextNumber = INCIDENCIAS_INICIALES.length + 1;
   const folio = `INC-${year}-${String(nextNumber).padStart(4, "0")}`;
+  const { evidencias, ...restData } = result.data;
   const created: IncidenciaCampus = {
     _id: `mock-${crypto.randomUUID()}`,
     folio,
-    ...result.data,
+    ...restData,
     estado: "abierta" as const,
     horas_invertidas: 0,
     fecha_creacion: now,
@@ -44,7 +45,13 @@ export async function POST(request: Request) {
       horas_sumadas: 0,
       comentario: "Incidencia creada.",
     }],
-    evidencias_adjuntas: [],
+    evidencias_adjuntas: (evidencias ?? []).map((item) => ({
+      nombre_archivo: item.nombre_archivo,
+      tipo_mime: item.tipo_mime,
+      peso_kb: item.peso_kb,
+      url_storage: `incidencias/${folio}/${item.nombre_archivo}`,
+      fecha_carga: now,
+    })),
   };
   INCIDENCIAS_INICIALES.push(created);
   return Response.json(
