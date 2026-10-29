@@ -33,7 +33,13 @@ const permissions: Record<FrontendRole, readonly Permission[]> = {
     "analitica:read",
   ],
   directiva: ["incidencia:read", "analitica:read"],
-  coordinador: ["incidencia:read", "incidencia:triage", "incidencia:update", "incidencia:tags"],
+  coordinador: [
+    "incidencia:read",
+    "incidencia:triage",
+    "incidencia:update",
+    "incidencia:tags",
+    "analitica:read",
+  ],
   tecnico: ["incidencia:read", "incidencia:update", "evidencia:upload"],
   reportante: ["incidencia:create", "incidencia:read", "evidencia:upload"],
 };

@@ -5,6 +5,7 @@ import { hasPermission, type FrontendRole } from "@/lib/rbac";
 import { getDb, sanitizeMongoError } from "@/lib/mongodb";
 import { PRIORIDAD_META, TECNICOS_DISPONIBLES } from "@/lib/incidencias/constants";
 import { PRIORIDADES, type IncidenciaCampus, type Prioridad, type TecnicoAsignado } from "@/lib/incidencias/types";
+import { generarUrlFirmada } from "@/lib/supabase";
 
 const triageSchema = z.object({
   prioridad: z.enum(["baja", "media", "alta", "critica"]).optional(),
@@ -28,9 +29,35 @@ function buildIdFilter(id: string): Record<string, unknown> {
   };
 }
 
-function formatIncidencia(doc: Record<string, unknown>): IncidenciaCampus {
+async function formatIncidencia(doc: Record<string, unknown>): Promise<IncidenciaCampus> {
   const reportanteRaw = (doc.reportante ?? {}) as Record<string, unknown>;
   const ubicacionRaw = (doc.ubicacion ?? {}) as Record<string, unknown>;
+
+  const evidenciasEnriquecidas = Array.isArray(doc.evidencias_adjuntas)
+    ? await Promise.all(
+        doc.evidencias_adjuntas.map(async (e: unknown) => {
+          const eObj = (e ?? {}) as Record<string, unknown>;
+          const storageKey = eObj.storage_key
+            ? String(eObj.storage_key)
+            : eObj.url_storage
+            ? String(eObj.url_storage)
+            : undefined;
+          const urlFirmada = storageKey ? await generarUrlFirmada(storageKey) : null;
+          return {
+            nombre_archivo: String(eObj.nombre_archivo ?? ""),
+            tipo_mime: String(eObj.tipo_mime ?? ""),
+            peso_kb: Number(eObj.peso_kb ?? 0),
+            storage_key: storageKey,
+            url_storage: eObj.url_storage ? String(eObj.url_storage) : undefined,
+            url_firmada: urlFirmada ?? undefined,
+            fecha_carga:
+              eObj.fecha_carga instanceof Date
+                ? eObj.fecha_carga.toISOString()
+                : String(eObj.fecha_carga ?? ""),
+          };
+        })
+      )
+    : [];
 
   return {
     _id: String(doc._id),
@@ -82,22 +109,7 @@ function formatIncidencia(doc: Record<string, unknown>): IncidenciaCampus {
           };
         })
       : [],
-    evidencias_adjuntas: Array.isArray(doc.evidencias_adjuntas)
-      ? doc.evidencias_adjuntas.map((e: unknown) => {
-          const eObj = (e ?? {}) as Record<string, unknown>;
-          return {
-            nombre_archivo: String(eObj.nombre_archivo ?? ""),
-            tipo_mime: String(eObj.tipo_mime ?? ""),
-            peso_kb: Number(eObj.peso_kb ?? 0),
-            storage_key: eObj.storage_key ? String(eObj.storage_key) : undefined,
-            url_storage: eObj.url_storage ? String(eObj.url_storage) : undefined,
-            fecha_carga:
-              eObj.fecha_carga instanceof Date
-                ? eObj.fecha_carga.toISOString()
-                : String(eObj.fecha_carga ?? ""),
-          };
-        })
-      : [],
+    evidencias_adjuntas: evidenciasEnriquecidas,
     ...(doc.tecnico_asignado
       ? {
           tecnico_asignado: doc.tecnico_asignado as TecnicoAsignado,
@@ -176,7 +188,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     }
   }
 
-  return Response.json({ data: formatIncidencia(doc) }, { status: 200 });
+  return Response.json({ data: await formatIncidencia(doc) }, { status: 200 });
 }
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
@@ -389,5 +401,5 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     return Response.json({ error: "Incidencia no encontrada." }, { status: 404 });
   }
 
-  return Response.json({ data: formatIncidencia(updatedDoc) }, { status: 200 });
+  return Response.json({ data: await formatIncidencia(updatedDoc) }, { status: 200 });
 }

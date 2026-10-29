@@ -1,19 +1,275 @@
-import { getIncidencia, type EvidenciaAdjunta } from "@/lib/incidencias/mock-data";
+import { ObjectId } from "mongodb";
+import { getSessionUser } from "@/lib/auth";
+import { getDb, sanitizeMongoError } from "@/lib/mongodb";
 import { hasPermission, type FrontendRole } from "@/lib/rbac";
+import {
+  hasSupabaseConfigured,
+  subirArchivoEvidencia,
+  generarUrlFirmada,
+  MIME_PERMITIDOS,
+  MAX_PESO_BYTES,
+  type TipoMimePermitido,
+} from "@/lib/supabase";
 
-const MIME_PERMITIDOS = ["image/png", "image/jpeg", "application/pdf"];
-
-export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
-  const { id } = await context.params;
-  const incidencia = getIncidencia(id);
-  if (!incidencia) return Response.json({ error: "Incidencia no encontrada" }, { status: 404 });
-  const role = request.headers.get("x-user-role") as FrontendRole | null;
-  if (role && !hasPermission(role, "evidencia:upload")) return Response.json({ error: "Tu rol no puede subir evidencias." }, { status: 403 });
-  const body = (await request.json()) as Partial<EvidenciaAdjunta>;
-  if (!body.nombre_archivo || !body.tipo_mime || !MIME_PERMITIDOS.includes(body.tipo_mime) || typeof body.peso_kb !== "number" || body.peso_kb > 5120) {
-    return Response.json({ error: "Formato no permitido o archivo mayor a 5120 KB" }, { status: 400 });
+function buildIdFilter(id: string) {
+  if (ObjectId.isValid(id) && String(new ObjectId(id)) === id) {
+    return { $or: [{ _id: new ObjectId(id) }, { folio: id }] };
   }
-  const evidencia: EvidenciaAdjunta = { nombre_archivo: body.nombre_archivo, tipo_mime: body.tipo_mime, peso_kb: body.peso_kb, fecha_carga: new Date().toISOString(), url_storage: `incidencias/${incidencia.folio}/${body.nombre_archivo}` };
-  incidencia.evidencias_adjuntas.push(evidencia);
-  return Response.json({ data: evidencia }, { status: 201 });
+  return { folio: id };
+}
+
+export async function POST(
+  request: Request,
+  context: { params: Promise<{ id: string }> }
+) {
+  // 1. Verificación de identidad autenticada
+  const sessionUser = await getSessionUser(request);
+  if (!sessionUser) {
+    return Response.json(
+      { error: "Autenticación requerida. Inicie sesión para continuar." },
+      { status: 401 }
+    );
+  }
+
+  // 2. Conexión a MongoDB Atlas
+  let db;
+  try {
+    db = await getDb();
+  } catch (err: unknown) {
+    const rawMessage = err instanceof Error ? err.message : "Error al conectar con MongoDB Atlas.";
+    return Response.json(
+      { error: sanitizeMongoError(rawMessage) },
+      { status: 503 }
+    );
+  }
+
+  // 3. Resolución y validación del usuario canónico en MongoDB
+  let canonicalUser;
+  try {
+    canonicalUser = await db.collection("usuarios").findOne({
+      id_usuario: sessionUser.id_usuario,
+      activo: true,
+    });
+  } catch (err: unknown) {
+    const rawMessage = err instanceof Error ? err.message : "Error al consultar usuario en MongoDB Atlas.";
+    return Response.json(
+      { error: sanitizeMongoError(rawMessage) },
+      { status: 503 }
+    );
+  }
+
+  if (!canonicalUser) {
+    return Response.json(
+      { error: "La identidad autenticada no corresponde a un usuario activo registrado en el sistema." },
+      { status: 403 }
+    );
+  }
+
+  const systemRole = canonicalUser.rol as FrontendRole;
+  if (!hasPermission(systemRole, "evidencia:upload")) {
+    return Response.json(
+      { error: "Tu rol no tiene permisos para adjuntar evidencias." },
+      { status: 403 }
+    );
+  }
+
+  // 4. Búsqueda y validación de la incidencia
+  const { id } = await context.params;
+  if (!id || typeof id !== "string" || !id.trim()) {
+    return Response.json({ error: "Identificador de incidencia inválido." }, { status: 400 });
+  }
+
+  const filter = buildIdFilter(id.trim());
+  let incidencia;
+  try {
+    incidencia = await db.collection("incidencias_campus").findOne(filter);
+  } catch (err: unknown) {
+    const rawMessage = err instanceof Error ? err.message : "Error al consultar incidencia en MongoDB Atlas.";
+    return Response.json(
+      { error: sanitizeMongoError(rawMessage) },
+      { status: 503 }
+    );
+  }
+
+  if (!incidencia) {
+    return Response.json({ error: "Incidencia no encontrada." }, { status: 404 });
+  }
+
+  // 5. Scoping y verificación de acceso a la incidencia
+  // - Reportante solo puede adjuntar a sus propias incidencias
+  // - Técnico solo puede adjuntar si está formalmente asignado a la incidencia
+  // - Coordinador y Admin tienen acceso institucional completo
+  if (systemRole === "reportante" && incidencia.reportante?.id_usuario !== canonicalUser.id_usuario) {
+    return Response.json(
+      { error: "No tienes permiso para adjuntar evidencias a un expediente ajeno." },
+      { status: 403 }
+    );
+  }
+
+  if (systemRole === "tecnico" && incidencia.tecnico_asignado?.id_usuario !== canonicalUser.id_usuario) {
+    return Response.json(
+      { error: "Solo el técnico asignado puede adjuntar evidencias técnicas a esta incidencia." },
+      { status: 403 }
+    );
+  }
+
+  // 6. Extracción y validación del archivo binario
+  const contentType = request.headers.get("content-type") || "";
+  let archivoBuffer: Buffer;
+  let nombreArchivo: string;
+  let tipoMime: string;
+
+  try {
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await request.formData();
+      const file = formData.get("file");
+      if (!file || !(file instanceof File)) {
+        return Response.json(
+          { error: "No se proporcionó ningún archivo en el campo 'file'." },
+          { status: 400 }
+        );
+      }
+
+      if (!MIME_PERMITIDOS.includes(file.type as TipoMimePermitido)) {
+        return Response.json(
+          { error: "Tipo de archivo no permitido. Solo se permiten PNG, JPG o PDF." },
+          { status: 400 }
+        );
+      }
+
+      if (file.size > MAX_PESO_BYTES) {
+        return Response.json(
+          { error: "El archivo excede el tamaño máximo permitido de 5 MB." },
+          { status: 400 }
+        );
+      }
+
+      const arrayBuffer = await file.arrayBuffer();
+      archivoBuffer = Buffer.from(arrayBuffer);
+      nombreArchivo = file.name;
+      tipoMime = file.type;
+    } else if (contentType.includes("application/json")) {
+      const body = (await request.json()) as {
+        nombre_archivo?: string;
+        tipo_mime?: string;
+        contenido_base64?: string;
+      };
+
+      if (!body.nombre_archivo || !body.tipo_mime || !body.contenido_base64) {
+        return Response.json(
+          { error: "Faltan campos requeridos: nombre_archivo, tipo_mime o contenido_base64." },
+          { status: 400 }
+        );
+      }
+
+      if (!MIME_PERMITIDOS.includes(body.tipo_mime as TipoMimePermitido)) {
+        return Response.json(
+          { error: "Tipo de archivo no permitido. Solo se permiten PNG, JPG o PDF." },
+          { status: 400 }
+        );
+      }
+
+      archivoBuffer = Buffer.from(body.contenido_base64, "base64");
+      if (archivoBuffer.length > MAX_PESO_BYTES) {
+        return Response.json(
+          { error: "El archivo excede el tamaño máximo permitido de 5 MB." },
+          { status: 400 }
+        );
+      }
+
+      nombreArchivo = String(body.nombre_archivo);
+      tipoMime = String(body.tipo_mime);
+    } else {
+      return Response.json(
+        { error: "Content-Type no soportado. Envíe multipart/form-data o application/json." },
+        { status: 400 }
+      );
+    }
+  } catch {
+    return Response.json(
+      { error: "Error al procesar el archivo o cuerpo de la petición." },
+      { status: 400 }
+    );
+  }
+
+  // 7. Carga física a Supabase Storage
+  if (!hasSupabaseConfigured()) {
+    return Response.json(
+      { error: "El servicio de Supabase Storage no está configurado en las variables de entorno del servidor." },
+      { status: 503 }
+    );
+  }
+
+  let uploadResult;
+  try {
+    uploadResult = await subirArchivoEvidencia({
+      archivoBuffer,
+      nombreArchivo,
+      tipoMime,
+      categoria: incidencia.categoria,
+      folio: incidencia.folio,
+    });
+  } catch (err: unknown) {
+    const rawMessage = err instanceof Error ? err.message : "Error al almacenar el archivo en Supabase Storage.";
+    return Response.json(
+      { error: rawMessage },
+      { status: 502 }
+    );
+  }
+
+  // 8. Persistencia de metadatos y auditoría atómica en MongoDB Atlas
+  const now = new Date();
+  const nombreLimpio = nombreArchivo.trim().replace(/[^a-zA-Z0-9._-]/g, "_");
+  const nuevaEvidencia = {
+    nombre_archivo: nombreLimpio,
+    tipo_mime: tipoMime,
+    peso_kb: uploadResult.pesoKb,
+    storage_key: uploadResult.storageKey,
+    url_storage: uploadResult.storageKey,
+    fecha_carga: now,
+  };
+
+  try {
+    const updateOp = {
+      $push: {
+        evidencias_adjuntas: nuevaEvidencia,
+        historial_seguimiento: {
+          fecha: now,
+          autor: canonicalUser.nombre,
+          estado_nuevo: incidencia.estado,
+          horas_sumadas: 0,
+          comentario: `Se adjuntó evidencia: ${nombreLimpio} (${tipoMime}, ${uploadResult.pesoKb} KB).`,
+        },
+      },
+    };
+
+    await db.collection("incidencias_campus").updateOne(
+      filter,
+      updateOp as unknown as Parameters<ReturnType<typeof db.collection>["updateOne"]>[1]
+    );
+  } catch (err: unknown) {
+    const rawMessage = err instanceof Error ? err.message : "Error al actualizar la incidencia en MongoDB Atlas.";
+    return Response.json(
+      { error: sanitizeMongoError(rawMessage) },
+      { status: 503 }
+    );
+  }
+
+  // 9. Generación de URL firmada temporal para descarga/visualización
+  const urlFirmada = await generarUrlFirmada(uploadResult.storageKey);
+
+  return Response.json(
+    {
+      data: {
+        nombre_archivo: nuevaEvidencia.nombre_archivo,
+        tipo_mime: nuevaEvidencia.tipo_mime,
+        peso_kb: nuevaEvidencia.peso_kb,
+        storage_key: nuevaEvidencia.storage_key,
+        url_storage: nuevaEvidencia.url_storage,
+        url_firmada: urlFirmada,
+        fecha_carga: now.toISOString(),
+      },
+    },
+    { status: 201 }
+  );
 }

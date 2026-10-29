@@ -74,6 +74,7 @@ export type EvidenciaAdjunta = {
   peso_kb: number;
   storage_key?: string;
   url_storage?: string;
+  url_firmada?: string;
   fecha_carga: string;
 };
 
