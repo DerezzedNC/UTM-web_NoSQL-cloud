@@ -10,11 +10,11 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setBusy(true);
-    const result = signIn(email, password);
+    const result = await signIn(email, password);
     if (result) {
       setError(result);
       setBusy(false);

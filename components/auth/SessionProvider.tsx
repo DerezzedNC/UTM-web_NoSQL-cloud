@@ -12,96 +12,18 @@ type Session = {
   name: string;
   department: string;
   email: string;
+  area_asignada?: string;
 };
 
 type SessionContextValue = {
   session: Session | null;
   hydrated: boolean;
-  signIn: (email: string, password: string) => string | null;
+  signIn: (email: string, password: string) => Promise<string | null>;
   switchRole: (role: FrontendRole) => void;
-  signOut: () => void;
+  signOut: () => Promise<void>;
 };
 
 const SESSION_KEY = "utm-desk-session";
-const roleProfiles: Record<FrontendRole, Omit<Session, "role">> = {
-  admin: {
-    id_usuario: "ADM-0311",
-    rol_institucional: "Administrativo",
-    name: "Carlos Méndez Cetina",
-    department: "Dirección de Tecnologías de la Información",
-    email: "carlos.mendez@utm.edu.mx",
-  },
-  directiva: {
-    id_usuario: "DIR-0014",
-    rol_institucional: "Administrativo",
-    name: "Dra. Carmen Solís Pech",
-    department: "Rectoría UTM",
-    email: "carmen.solis@utm.edu.mx",
-  },
-  coordinador: {
-    id_usuario: "CRD-0105",
-    rol_institucional: "Administrativo",
-    name: "Ing. Luis Briceño Tun",
-    department: "Coordinación de Operaciones de Campus",
-    email: "luis.briceno@utm.edu.mx",
-  },
-  tecnico: {
-    id_usuario: "TEC-0205",
-    rol_institucional: "Administrativo",
-    name: "Ing. Roberto Pech Moo",
-    department: "Cómputo y Telecomunicaciones",
-    email: "roberto.pech@utm.edu.mx",
-  },
-  reportante: {
-    id_usuario: "DOC-1042",
-    rol_institucional: "Docente",
-    name: "Mtro. Carlos Méndez Cetina",
-    department: "División de Tecnologías de la Información",
-    email: "carlos.docente@utm.edu.mx",
-  },
-};
-
-const additionalAccounts: Record<string, Session> = {
-  "admin@utm.edu.mx": { role: "admin", ...roleProfiles.admin },
-  "directiva@utm.edu.mx": { role: "directiva", ...roleProfiles.directiva },
-  "coordinador@utm.edu.mx": { role: "coordinador", ...roleProfiles.coordinador },
-  "tecnico@utm.edu.mx": { role: "tecnico", ...roleProfiles.tecnico },
-  "reportante@utm.edu.mx": { role: "reportante", ...roleProfiles.reportante },
-  "miguel.balam@utm.edu.mx": {
-    id_usuario: "TEC-0412",
-    role: "tecnico",
-    rol_institucional: "Administrativo",
-    name: "Téc. Miguel Balam Dzib",
-    department: "Mantenimiento e Infraestructura Física",
-    email: "miguel.balam@utm.edu.mx",
-  },
-  "sofia.ortiz@utm.edu.mx": {
-    id_usuario: "TEC-0518",
-    role: "tecnico",
-    rol_institucional: "Administrativo",
-    name: "Lic. Sofía Ortiz Lara",
-    department: "Servicios Escolares y Plataformas Académicas",
-    email: "sofia.ortiz@utm.edu.mx",
-  },
-  "laura.canto@utm.edu.mx": {
-    id_usuario: "ADM-0422",
-    role: "reportante",
-    rol_institucional: "Administrativo",
-    name: "Lic. Laura Canto Várguez",
-    department: "Servicios Escolares",
-    email: "laura.canto@utm.edu.mx",
-  },
-  "alejandro.perez@utm.edu.mx": {
-    id_usuario: "EST-2024",
-    role: "reportante",
-    rol_institucional: "Estudiante",
-    name: "Alejandro Pérez Noh",
-    department: "Ingeniería en Desarrollo de Software",
-    email: "alejandro.perez@utm.edu.mx",
-  },
-};
-
-const DEMO_PASSWORD = "utm-demo";
 
 const SessionContext = createContext<SessionContextValue | null>(null);
 
@@ -116,6 +38,26 @@ function canAccess(role: FrontendRole, pathname: string) {
   return pathname.startsWith("/incidencias");
 }
 
+function userToSession(user: {
+  id_usuario: string;
+  rol: FrontendRole;
+  nombre: string;
+  correo: string;
+  departamento?: string;
+  rol_institucional?: string;
+  area_asignada?: string;
+}): Session {
+  return {
+    id_usuario: user.id_usuario,
+    role: user.rol,
+    rol_institucional: (user.rol_institucional ?? "Administrativo") as RolReportante,
+    name: user.nombre,
+    department: user.departamento || "UTM Campus",
+    email: user.correo,
+    ...(user.area_asignada ? { area_asignada: user.area_asignada } : {}),
+  };
+}
+
 export function SessionProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -123,25 +65,33 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
+    let isMounted = true;
+
+    async function hydrate() {
+      try {
+        const res = await fetch("/api/auth/me");
+        if (res.ok) {
+          const body = (await res.json()) as { data?: { user: Parameters<typeof userToSession>[0] } };
+          if (body.data?.user && isMounted) {
+            const serverSession = userToSession(body.data.user);
+            setSession(serverSession);
+            window.localStorage.setItem(SESSION_KEY, JSON.stringify(serverSession));
+            setHydrated(true);
+            return;
+          }
+        }
+      } catch {
+        // Fallback local ante fallos transitorios de red
+      }
+
+      if (!isMounted) return;
+
       const stored = window.localStorage.getItem(SESSION_KEY);
       if (stored) {
         try {
-          const parsed = JSON.parse(stored) as Partial<Session> & { role?: FrontendRole };
-          if (parsed.role && roleProfiles[parsed.role]) {
-            const legacyIds = new Set(["u-carlos-mendez", "u-tec-morales", "u-coord-valenzuela", "u-directiva-arizmendi", "u-admin-mendez"]);
-            const useProfileDefault = !parsed.id_usuario || legacyIds.has(parsed.id_usuario);
-            const normalized: Session = useProfileDefault
-              ? { role: parsed.role, ...roleProfiles[parsed.role] }
-              : {
-                  role: parsed.role,
-                  ...roleProfiles[parsed.role],
-                  ...parsed,
-                  id_usuario: parsed.id_usuario!,
-                  rol_institucional: parsed.rol_institucional ?? roleProfiles[parsed.role].rol_institucional,
-                };
-            window.localStorage.setItem(SESSION_KEY, JSON.stringify(normalized));
-            setSession(normalized);
+          const parsed = JSON.parse(stored) as Session;
+          if (parsed.role && parsed.id_usuario) {
+            setSession(parsed);
           } else {
             window.localStorage.removeItem(SESSION_KEY);
           }
@@ -150,8 +100,13 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
         }
       }
       setHydrated(true);
-    }, 0);
-    return () => window.clearTimeout(timer);
+    }
+
+    hydrate();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -169,45 +124,54 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     }
   }, [hydrated, pathname, router, session]);
 
-  const value = useMemo<SessionContextValue>(() => ({
-    session,
-    hydrated,
-    signIn: (email, password) => {
-      const normalizedEmail = email.trim().toLowerCase();
-      if (password !== DEMO_PASSWORD) {
-        return "Correo o contraseña incorrectos.";
-      }
-      if (additionalAccounts[normalizedEmail]) {
-        const next = additionalAccounts[normalizedEmail];
-        window.localStorage.setItem(SESSION_KEY, JSON.stringify(next));
-        setSession(next);
-        router.replace("/portal");
-        return null;
-      }
-      const role = (Object.keys(roleProfiles) as FrontendRole[]).find(
-        (candidate) => roleProfiles[candidate].email === normalizedEmail,
-      );
-      if (!role) {
-        return "Correo o contraseña incorrectos.";
-      }
-      const next = { role, ...roleProfiles[role] };
-      window.localStorage.setItem(SESSION_KEY, JSON.stringify(next));
-      setSession(next);
-      router.replace("/portal");
-      return null;
-    },
-    switchRole: (role) => {
-      const next = { role, ...roleProfiles[role] };
-      window.localStorage.setItem(SESSION_KEY, JSON.stringify(next));
-      setSession(next);
-      router.replace("/portal");
-    },
-    signOut: () => {
-      window.localStorage.removeItem(SESSION_KEY);
-      setSession(null);
-      router.replace("/login");
-    },
-  }), [hydrated, router, session]);
+  const value = useMemo<SessionContextValue>(
+    () => ({
+      session,
+      hydrated,
+      signIn: async (email, password) => {
+        try {
+          const res = await fetch("/api/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ correo: email.trim(), password }),
+          });
+          const body = (await res.json()) as {
+            data?: { user: Parameters<typeof userToSession>[0] };
+            error?: string;
+          };
+          if (!res.ok || !body.data?.user) {
+            return body.error ?? "Correo o contraseña incorrectos.";
+          }
+          const next = userToSession(body.data.user);
+          window.localStorage.setItem(SESSION_KEY, JSON.stringify(next));
+          setSession(next);
+          router.replace("/portal");
+          return null;
+        } catch {
+          return "No se pudo conectar con el servicio de autenticación.";
+        }
+      },
+      switchRole: (role) => {
+        if (session) {
+          const updated: Session = { ...session, role };
+          window.localStorage.setItem(SESSION_KEY, JSON.stringify(updated));
+          setSession(updated);
+          router.replace("/portal");
+        }
+      },
+      signOut: async () => {
+        try {
+          await fetch("/api/auth/logout", { method: "POST" });
+        } catch {
+          // Continuar con limpieza local incluso si la red falla
+        }
+        window.localStorage.removeItem(SESSION_KEY);
+        setSession(null);
+        router.replace("/login");
+      },
+    }),
+    [hydrated, router, session]
+  );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

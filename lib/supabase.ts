@@ -3,7 +3,9 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 export const BUCKET_EVIDENCIAS = "evidencias-utm";
 export const URL_FIRMADA_VIGENCIA_SEGUNDOS = 3600; // 1 hora (RNF-01 / CU-02)
 export const MIME_PERMITIDOS = ["image/png", "image/jpeg", "application/pdf"] as const;
-export const MAX_PESO_KB = 5120; // 5 MB (RNF-07)
+export type TipoMimePermitido = (typeof MIME_PERMITIDOS)[number];
+export const MAX_PESO_BYTES = 5 * 1024 * 1024; // 5 MB (RNF-07)
+export const MAX_PESO_KB = 5120;
 
 let supabaseInstance: SupabaseClient | null = null;
 let bucketVerified = false;
@@ -11,7 +13,7 @@ let bucketVerified = false;
 /**
  * Normaliza SUPABASE_URL por si tiene comillas, barras finales o rutas de dashboard/storage
  */
-function normalizarSupabaseUrl(rawUrl: string): string {
+export function normalizarSupabaseUrl(rawUrl: string): string {
   const limpia = rawUrl.trim().replace(/^["']|["']$/g, "");
 
   // Si pegaron el link del dashboard: https://supabase.com/dashboard/project/xyz...
@@ -28,7 +30,7 @@ function normalizarSupabaseUrl(rawUrl: string): string {
 export function hasSupabaseConfigured(): boolean {
   return Boolean(
     process.env.SUPABASE_URL?.trim() &&
-      process.env.SUPABASE_SERVICE_ROLE_KEY?.trim(),
+      process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
   );
 }
 
@@ -42,7 +44,7 @@ export function getSupabaseClient(): SupabaseClient {
 
   if (!rawUrl || !rawKey) {
     throw new Error(
-      "Faltan las variables SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY en .env.local",
+      "Faltan las variables SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY en .env.local"
     );
   }
 
@@ -59,6 +61,14 @@ export function getSupabaseClient(): SupabaseClient {
   return supabaseInstance;
 }
 
+/**
+ * Permite inyectar un cliente de Supabase (doble de prueba) para suites automatizadas
+ */
+export function setSupabaseClientForTesting(client: SupabaseClient | null) {
+  supabaseInstance = client;
+  bucketVerified = client !== null;
+}
+
 async function ensureBucketExists(supabase: SupabaseClient) {
   if (bucketVerified) return;
   try {
@@ -67,7 +77,7 @@ async function ensureBucketExists(supabase: SupabaseClient) {
     if (!exists) {
       await supabase.storage.createBucket(BUCKET_EVIDENCIAS, {
         public: false,
-        fileSizeLimit: 5 * 1024 * 1024,
+        fileSizeLimit: MAX_PESO_BYTES,
         allowedMimeTypes: ["image/png", "image/jpeg", "application/pdf"],
       });
     }
@@ -86,7 +96,7 @@ export function extraerRutaInternaBucket(storageKey: string): string {
 }
 
 export async function subirArchivoEvidencia(params: {
-  archivoBuffer: Buffer | ArrayBuffer;
+  archivoBuffer: Buffer | ArrayBuffer | Uint8Array;
   nombreArchivo: string;
   tipoMime: string;
   categoria: string;

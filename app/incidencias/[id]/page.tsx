@@ -1,18 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
 import { useSession } from "@/components/auth/SessionProvider";
 import { CATEGORIA_META, PRIORIDAD_META, TECNICOS_DISPONIBLES } from "@/lib/incidencias/constants";
 import { canCloseTicket, hasPermission } from "@/lib/rbac";
-import { PRIORIDADES, type EstadoIncidencia, type IncidenciaCampus, type Prioridad } from "@/lib/incidencias/types";
+import { PRIORIDADES, type EstadoIncidencia, type EvidenciaAdjunta, type IncidenciaCampus, type Prioridad } from "@/lib/incidencias/types";
 
 const estadosTecnico: EstadoIncidencia[] = ["en proceso", "en espera", "resuelta"];
 const estadosCoordinador: EstadoIncidencia[] = ["abierta", "en proceso", "en espera", "resuelta", "cerrada"];
 const stateStyle: Record<EstadoIncidencia, string> = {
   abierta: "bg-teal-50 text-teal-700",
   "en proceso": "bg-emerald-50 text-emerald-700",
+  en_proceso: "bg-emerald-50 text-emerald-700",
   "en espera": "bg-amber-50 text-amber-700",
+  en_espera: "bg-amber-50 text-amber-700",
   resuelta: "bg-emerald-50 text-emerald-700",
   cerrada: "bg-slate-100 text-slate-600",
 };
@@ -31,6 +33,8 @@ export default function IncidenciaDetallePage({ params }: { params: Promise<{ id
   const [idTecnico, setIdTecnico] = useState("");
   const [riesgoSeguridad, setRiesgoSeguridad] = useState("Medio");
   const [notice, setNotice] = useState("");
+  const [uploadingEvidence, setUploadingEvidence] = useState(false);
+  const [evidenceError, setEvidenceError] = useState("");
 
   const canTriage = Boolean(session && hasPermission(session.role, "incidencia:triage"));
   const canUpdate = Boolean(session && hasPermission(session.role, "incidencia:update"));
@@ -159,6 +163,59 @@ export default function IncidenciaDetallePage({ params }: { params: Promise<{ id
     setTicket({ ...ticket, tags: body.data });
     setTag("");
     setNotice("Etiquetas actualizadas.");
+  }
+
+  const canUploadEvidence = useMemo(() => {
+    if (!session || !ticket) return false;
+    if (session.role === "admin" || session.role === "coordinador") return true;
+    if (session.role === "reportante") {
+      return (
+        ticket.reportante.id_usuario === session.id_usuario ||
+        ticket.reportante.correo.toLowerCase() === session.email.toLowerCase()
+      );
+    }
+    if (session.role === "tecnico") {
+      return Boolean(
+        ticket.tecnico_asignado &&
+          (ticket.tecnico_asignado.id_usuario === session.id_usuario ||
+            ticket.tecnico_asignado.correo.toLowerCase() === session.email.toLowerCase()),
+      );
+    }
+    return false;
+  }, [session, ticket]);
+
+  async function uploadEvidence(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !ticket) return;
+    setEvidenceError("");
+    setUploadingEvidence(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(`/api/incidencias/${ticket._id}/evidencias`, {
+        method: "POST",
+        body: formData,
+      });
+      const body = (await res.json()) as {
+        data?: EvidenciaAdjunta;
+        evidencias_adjuntas?: EvidenciaAdjunta[];
+        error?: string;
+      };
+      if (!res.ok || !body.data) {
+        setEvidenceError(body.error ?? "No se pudo subir la evidencia.");
+        return;
+      }
+      setTicket({
+        ...ticket,
+        evidencias_adjuntas: body.evidencias_adjuntas ?? [body.data, ...ticket.evidencias_adjuntas],
+      });
+      setNotice(`Evidencia adjuntada exitosamente: ${file.name}`);
+    } catch {
+      setEvidenceError("Error al subir el archivo.");
+    } finally {
+      setUploadingEvidence(false);
+    }
   }
 
   if (loading) return <main className="min-h-screen bg-slate-50 p-8 text-slate-600">Cargando expediente...</main>;
@@ -455,7 +512,10 @@ export default function IncidenciaDetallePage({ params }: { params: Promise<{ id
               {ticket.evidencias_adjuntas.length > 0 ? (
                 <ul className="mt-4 space-y-3 text-xs">
                   {ticket.evidencias_adjuntas.map((item) => (
-                    <li key={item.url_storage} className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <li
+                      key={item.storage_key || item.url_storage || item.nombre_archivo}
+                      className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-3"
+                    >
                       {item.tipo_mime.startsWith("image/") && item.url_firmada ? (
                         <a
                           href={item.url_firmada}
@@ -463,6 +523,7 @@ export default function IncidenciaDetallePage({ params }: { params: Promise<{ id
                           rel="noreferrer"
                           className="mb-2.5 block overflow-hidden rounded-lg border border-slate-200 bg-white"
                         >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={item.url_firmada}
                             alt={item.nombre_archivo}
@@ -484,16 +545,39 @@ export default function IncidenciaDetallePage({ params }: { params: Promise<{ id
                           {item.tipo_mime === "application/pdf" ? "Abrir documento PDF ↗" : "Ver imagen completa ↗"}
                         </a>
                       ) : (
-                        <p className="mt-1 truncate font-mono text-[11px] text-slate-400">{item.url_storage}</p>
+                        <p className="mt-1 truncate font-mono text-[11px] text-slate-400">
+                          {item.url_storage}
+                        </p>
                       )}
                     </li>
                   ))}
                 </ul>
               ) : (
                 <p className="mt-3 text-xs text-slate-500">
-                  El reportante no adjuntó archivos al momento de registrar esta incidencia.
+                  Aún no se han adjuntado archivos a este expediente.
                 </p>
               )}
+
+              {canUploadEvidence ? (
+                <div className="mt-4 border-t border-slate-100 pt-3">
+                  <label className="block text-xs font-semibold text-slate-700">
+                    Adjuntar nueva evidencia (PNG, JPG, PDF hasta 5 MB):
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,application/pdf"
+                    disabled={uploadingEvidence}
+                    onChange={uploadEvidence}
+                    className="mt-2 block w-full text-xs text-slate-600 file:mr-2 file:rounded-lg file:border-0 file:bg-teal-50 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-teal-700 hover:file:bg-teal-100 disabled:opacity-50"
+                  />
+                  {uploadingEvidence ? (
+                    <p className="mt-2 text-xs font-semibold text-teal-700">Subiendo archivo a Supabase Storage...</p>
+                  ) : null}
+                  {evidenceError ? (
+                    <p className="mt-2 text-xs font-semibold text-rose-600">{evidenceError}</p>
+                  ) : null}
+                </div>
+              ) : null}
             </OperationCard>
           </aside>
         </div>

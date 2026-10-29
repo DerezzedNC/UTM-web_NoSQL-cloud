@@ -18,7 +18,9 @@ const estados: { value: "" | EstadoIncidencia; label: string }[] = [
 const stateStyle: Record<EstadoIncidencia, string> = {
   abierta: "bg-teal-50 text-teal-700",
   "en proceso": "bg-emerald-50 text-emerald-700",
+  en_proceso: "bg-emerald-50 text-emerald-700",
   "en espera": "bg-slate-100 text-slate-600",
+  en_espera: "bg-slate-100 text-slate-600",
   resuelta: "bg-emerald-50 text-emerald-700",
   cerrada: "bg-slate-100 text-slate-500",
 };

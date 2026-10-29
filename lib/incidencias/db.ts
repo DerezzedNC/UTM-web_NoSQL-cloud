@@ -92,10 +92,12 @@ export function mapMongoDocToIncidencia(doc: Document): IncidenciaCampus {
           };
 
   const rawReportante = (doc.reportante ?? {}) as Record<string, unknown>;
+  const rolInstitucional = (rawReportante.rol_institucional ?? rawReportante.rol ?? "Docente") as RolReportante;
   const reportante = {
     id_usuario: String(rawReportante.id_usuario ?? ""),
     nombre: String(rawReportante.nombre ?? ""),
-    rol: (rawReportante.rol_institucional ?? rawReportante.rol ?? "Docente") as RolReportante,
+    rol_institucional: rolInstitucional,
+    rol: rolInstitucional,
     correo: String(rawReportante.correo ?? ""),
   };
 
@@ -164,7 +166,7 @@ async function enriquecerEvidenciasConUrlFirmada(
   const evidenciasConUrl = await Promise.all(
     incidencia.evidencias_adjuntas.map(async (ev) => ({
       ...ev,
-      url_firmada: ev.url_firmada ?? (await generarUrlFirmada(ev.url_storage)),
+      url_firmada: ev.url_firmada ?? (await generarUrlFirmada(ev.storage_key || ev.url_storage || "")),
     })),
   );
   return {

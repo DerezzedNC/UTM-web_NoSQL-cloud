@@ -129,6 +129,10 @@ async function connectWithSrvFallback(uri: string): Promise<MongoClient> {
  * En modo desarrollo se preserva en `globalThis` para evitar agotar el pool de conexiones con Hot Reloading.
  */
 export function getMongoClientPromise(): Promise<MongoClient> {
+  if (global._mongoClientPromise) {
+    return global._mongoClientPromise;
+  }
+
   const uri = process.env.MONGODB_URI;
 
   if (!uri || !uri.trim()) {
@@ -137,7 +141,7 @@ export function getMongoClientPromise(): Promise<MongoClient> {
     );
   }
 
-  if (process.env.NODE_ENV === "development") {
+  if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test") {
     if (!global._mongoClientPromise) {
       global._mongoClientPromise = connectWithSrvFallback(uri.trim()).catch((err) => {
         global._mongoClientPromise = undefined;

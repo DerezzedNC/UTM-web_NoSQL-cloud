@@ -7,6 +7,7 @@ export type FrontendRole =
 
 export type Permission =
   | "incidencia:create"
+  | "evidencia:upload"
   | "incidencia:triage"
   | "evidencia:upload"
   | "incidencia:update"
@@ -25,6 +26,7 @@ export const ROLE_LABELS: Record<FrontendRole, string> = {
 const permissions: Record<FrontendRole, readonly Permission[]> = {
   admin: [
     "incidencia:create",
+    "evidencia:upload",
     "incidencia:triage",
     "evidencia:upload",
     "incidencia:update",
@@ -33,13 +35,19 @@ const permissions: Record<FrontendRole, readonly Permission[]> = {
     "analitica:read",
   ],
   directiva: ["incidencia:read", "analitica:read"],
-  coordinador: ["incidencia:read", "incidencia:triage", "incidencia:update", "incidencia:tags"],
+  coordinador: [
+    "incidencia:read",
+    "incidencia:triage",
+    "incidencia:update",
+    "incidencia:tags",
+    "analitica:read",
+  ],
   tecnico: ["incidencia:read", "incidencia:update", "evidencia:upload"],
   reportante: ["incidencia:create", "incidencia:read", "evidencia:upload"],
 };
 
 export function hasPermission(role: FrontendRole, permission: Permission) {
-  return permissions[role].includes(permission);
+  return permissions[role]?.includes(permission) ?? false;
 }
 
 export function canCloseTicket(role: FrontendRole) {

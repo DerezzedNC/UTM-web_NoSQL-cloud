@@ -76,10 +76,11 @@ export const BORRADOR_INICIAL: BorradorIncidencia = {
     aula_laboratorio: "",
   },
   reportante: {
-    id_usuario: "DOC-1042",
-    nombre: "Mtro. Carlos Méndez Cetina",
+    id_usuario: "",
+    nombre: "",
+    rol_institucional: "Docente",
     rol: "Docente",
-    correo: "carlos.docente@utm.edu.mx",
+    correo: "",
   },
   evidencias: [],
   detalle_computo: {

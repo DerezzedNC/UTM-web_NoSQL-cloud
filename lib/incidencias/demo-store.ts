@@ -5,6 +5,7 @@ import {
   type EvidenciaAdjunta,
   type IncidenciaDetalle,
 } from "./mock-data";
+import type { RolReportante } from "./types";
 
 const STORAGE_KEY = "utm-desk-demo-incidencias";
 let nextNumber = INCIDENCIAS_INICIALES.length + 1;
@@ -64,7 +65,8 @@ export function createDemoIncidencia(payload: RegistroIncidenciaPayload) {
       id_usuario: payload.reportante.id_usuario,
       nombre: payload.reportante.nombre,
       correo: payload.reportante.correo,
-      rol: payload.reportante.rol,
+      rol_institucional: (payload.reportante.rol_institucional ?? payload.reportante.rol) as RolReportante,
+      rol: (payload.reportante.rol ?? payload.reportante.rol_institucional) as RolReportante,
     },
     detalle_especifico: detalle,
     historial_seguimiento: [{

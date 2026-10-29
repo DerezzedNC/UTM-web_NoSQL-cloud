@@ -6,10 +6,12 @@ export const CATEGORIAS = [
 ] as const;
 export const ESTADOS_INCIDENCIA = [
   "abierta",
-  "en proceso",
-  "en espera",
+  "en_proceso",
+  "en_espera",
   "resuelta",
   "cerrada",
+  "en proceso",
+  "en espera",
 ] as const;
 export const ROLES_REPORTANTE = ["Docente", "Estudiante", "Administrativo"] as const;
 
@@ -42,6 +44,7 @@ export type DetalleInfraestructura = {
   tipo_dano: string;
   riesgo_seguridad: string;
   requiere_insumos: boolean;
+  insumos_solicitados?: string[];
   contratista_externo: boolean;
 };
 
@@ -69,8 +72,8 @@ export type EvidenciaAdjunta = {
   nombre_archivo: string;
   tipo_mime: string;
   peso_kb: number;
-  url_storage: string;
   storage_key?: string;
+  url_storage?: string;
   url_firmada?: string | null;
   fecha_carga: string;
 };
@@ -89,8 +92,9 @@ export type IncidenciaCampus = {
   reportante: {
     id_usuario: string;
     nombre: string;
-    rol: RolReportante;
+    rol_institucional: RolReportante;
     correo: string;
+    rol?: RolReportante;
   };
   tecnico_asignado?: TecnicoAsignado;
   ubicacion: UbicacionCampus;
@@ -107,9 +111,11 @@ export type BorradorDetalleComputo = Omit<DetalleComputoRedes, "vlan" | "equipos
 
 export type BorradorDetalleInfraestructura = DetalleInfraestructura;
 
+export type TipoMimeEvidencia = "image/png" | "image/jpeg" | "application/pdf";
+
 export type BorradorEvidencia = {
   nombre_archivo: string;
-  tipo_mime: string;
+  tipo_mime: TipoMimeEvidencia;
   peso_kb: number;
   contenido_base64?: string;
   preview_url?: string;
@@ -124,6 +130,7 @@ export type BorradorIncidencia = {
   reportante: {
     id_usuario: string;
     nombre: string;
+    rol_institucional?: RolReportante;
     rol: RolReportante;
     correo: string;
   };

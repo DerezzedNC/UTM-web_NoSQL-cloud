@@ -1,0 +1,122 @@
+{
+  "info": {
+    "name": "UTM Desk - Backend Core API",
+    "description": "Colección de pruebas para autenticación y persistencia canónica de incidencias",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Iniciar Sesión (Login)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"correo\": \"docente@utm.edu.mx\",\n  \"password\": \"TuContrasenaAqui\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/login",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "login"]
+        },
+        "description": "Autentica al usuario contra MongoDB Atlas, genera JWT HS256 y establece la cookie HttpOnly utm_session."
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "    var json = pm.response.json();",
+              "    if (json.data && json.data.token) {",
+              "        pm.environment.set('token', json.data.token);",
+              "        console.log('Token JWT almacenado en variable de entorno: ' + json.data.token);",
+              "    }",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Verificar Sesión Actual (Me)",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/me",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "me"]
+        },
+        "description": "Obtiene la identidad verificada del usuario autenticado a partir del JWT o cookie HttpOnly."
+      }
+    },
+    {
+      "name": "3. Crear Incidencia (Cómputo y Redes)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"titulo\": \"Falla de enlace troncal en switch central\",\n  \"descripcion\": \"Pérdida de conectividad con la red institucional tras mantenimiento preventivo.\",\n  \"categoria\": \"computo_redes\",\n  \"prioridad\": \"alta\",\n  \"ubicacion\": {\n    \"edificio\": \"Edificio 2\",\n    \"piso\": \"Planta Alta\",\n    \"aula_laboratorio\": \"Laboratorio de Redes\"\n  },\n  \"reportante\": {\n    \"id_usuario\": \"usr_doc_01\",\n    \"nombre\": \"Profesor de Redes\",\n    \"rol_institucional\": \"Docente\",\n    \"correo\": \"docente@utm.edu.mx\"\n  },\n  \"tags\": [\"conectividad\", \"switch\"],\n  \"detalle_especifico\": {\n    \"direccion_ip\": \"192.168.10.1\",\n    \"vlan\": 20,\n    \"puerto_uplink\": \"Gi0/24\",\n    \"equipos_afectados\": 12\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/incidencias",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "incidencias"]
+        },
+        "description": "Crea una incidencia real: valida Zod, incrementa contador atómico Upstash Redis y persiste en MongoDB Atlas."
+      }
+    },
+    {
+      "name": "4. Crear Incidencia (Infraestructura)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"titulo\": \"Filtración pluvial en laboratorio de cómputo\",\n  \"descripcion\": \"Humedad excesiva sobre tableros eléctricos y ductería de red en techo falso.\",\n  \"categoria\": \"infraestructura\",\n  \"prioridad\": \"critica\",\n  \"ubicacion\": {\n    \"edificio\": \"Edificio 3\",\n    \"piso\": \"1\",\n    \"aula_laboratorio\": \"Lab 3\"\n  },\n  \"reportante\": {\n    \"id_usuario\": \"usr_adm_01\",\n    \"nombre\": \"Lic. García\",\n    \"rol_institucional\": \"Administrativo\",\n    \"correo\": \"admin_staff@utm.edu.mx\"\n  },\n  \"tags\": [\"filtracion\", \"riesgo\"],\n  \"detalle_especifico\": {\n    \"tipo_dano\": \"Filtración en losa superior\",\n    \"riesgo_seguridad\": \"Alto\",\n    \"requiere_insumos\": true,\n    \"insumos_solicitados\": [\"Sellador acrílico\", \"Membrana elastomérica\"],\n    \"contratista_externo\": false\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/incidencias",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "incidencias"]
+        }
+      }
+    },
+    {
+      "name": "5. Cerrar Sesión (Logout)",
+      "request": {
+        "method": "POST",
+        "url": {
+          "raw": "{{baseUrl}}/api/auth/logout",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "auth", "logout"]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

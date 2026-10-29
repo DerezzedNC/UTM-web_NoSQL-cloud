@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useState } from "react";
+import { ChangeEvent, FormEvent, useState } from "react";
 import { useSession } from "@/components/auth/SessionProvider";
 import { CamposUbicacion } from "@/components/incidencias/registro/CamposUbicacion";
 import { CamposUniversales } from "@/components/incidencias/registro/CamposUniversales";
@@ -13,7 +13,8 @@ import { registroIncidenciaSchema } from "@/lib/incidencias/registro-schema";
 import { erroresPorCampo } from "@/lib/incidencias/schema";
 import { CATEGORIAS, type BorradorIncidencia, type CategoriaIncidencia } from "@/lib/incidencias/types";
 
-const MIME_PERMITIDOS = ["image/png", "image/jpeg", "application/pdf"];
+const MIME_PERMITIDOS = ["image/png", "image/jpeg", "application/pdf"] as const;
+type MimePermitido = (typeof MIME_PERMITIDOS)[number];
 const MAX_PESO_BYTES = 5 * 1024 * 1024;
 
 export function RegistroIncidenciaForm() {
@@ -23,19 +24,6 @@ export function RegistroIncidenciaForm() {
   const [errores, setErrores] = useState<Record<string, string>>({});
   const [mensaje, setMensaje] = useState("");
   const [subiendo, setSubiendo] = useState(false);
-
-  useEffect(() => {
-    if (!session) return;
-    setBorrador((actual) => ({
-      ...actual,
-      reportante: {
-        id_usuario: session.id_usuario,
-        nombre: session.name,
-        rol: session.rol_institucional,
-        correo: session.email,
-      },
-    }));
-  }, [session]);
 
   function actualizar<K extends keyof BorradorIncidencia>(campo: K, valor: BorradorIncidencia[K]) {
     setBorrador((actual) => ({ ...actual, [campo]: valor }));
@@ -51,7 +39,7 @@ export function RegistroIncidenciaForm() {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
-    if (!MIME_PERMITIDOS.includes(file.type) || file.size > MAX_PESO_BYTES) {
+    if (!MIME_PERMITIDOS.includes(file.type as MimePermitido) || file.size > MAX_PESO_BYTES) {
       setErrores((actual) => ({
         ...actual,
         evidencias: "Solo se permiten archivos PNG, JPG o PDF de hasta 5 MB.",
@@ -66,7 +54,6 @@ export function RegistroIncidenciaForm() {
       }));
       return;
     }
-
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = typeof reader.result === "string" ? reader.result : "";
@@ -77,7 +64,7 @@ export function RegistroIncidenciaForm() {
           ...actual.evidencias,
           {
             nombre_archivo: file.name,
-            tipo_mime: file.type,
+            tipo_mime: file.type as MimePermitido,
             peso_kb,
             contenido_base64: base64Part,
             preview_url: dataUrl,
@@ -153,7 +140,14 @@ export function RegistroIncidenciaForm() {
     }
   }
 
-  const reportante = borrador.reportante;
+  const reportante = session
+    ? {
+        id_usuario: session.id_usuario,
+        nombre: session.name,
+        rol: session.rol_institucional,
+        correo: session.email,
+      }
+    : borrador.reportante;
 
   return (
     <form onSubmit={enviar} className="space-y-6" noValidate>
@@ -223,6 +217,7 @@ export function RegistroIncidenciaForm() {
               {borrador.evidencias.map((item) => (
                 <li key={item.nombre_archivo} className="overflow-hidden rounded-xl border border-slate-200 bg-white p-3 text-xs shadow-xs">
                   {item.tipo_mime.startsWith("image/") && item.preview_url ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
                     <img
                       src={item.preview_url}
                       alt={item.nombre_archivo}
